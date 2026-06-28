@@ -62,7 +62,16 @@ app.kubernetes.io/version: {{ .root.Chart.AppVersion | quote }}
 {{- define "wallmart.appImage" -}}
 {{- $registry := .root.Values.global.imageRegistry -}}
 {{- $tag := .root.Values.global.imageTag -}}
+{{- if .tag }}{{- $tag = .tag -}}{{- end -}}
 {{- printf "%s/%s:%s" $registry .repository $tag }}
+{{- end }}
+
+{{- define "wallmart.ecommerceWebContainerPort" -}}
+{{- if .Values.openshift.enabled -}}
+{{- .Values.openshift.ecommerceWeb.containerPort -}}
+{{- else -}}
+80
+{{- end -}}
 {{- end }}
 
 {{- define "wallmart.mssqlSecretName" -}}
@@ -103,7 +112,9 @@ MSSQL_SA_PASSWORD
 {{- if .root.Values.initContainers.waitForSql.enabled }}
 - name: wait-for-sql
   image: {{ .root.Values.initContainers.waitForSql.image }}
-  imagePullPolicy: {{ .root.Values.global.imagePullPolicy }}
+  imagePullPolicy: Always
+  securityContext:
+    {{- include "wallmart.initContainerSecurityContext" .root | nindent 4 }}
   command:
     - sh
     - -c
@@ -119,7 +130,9 @@ MSSQL_SA_PASSWORD
 {{- if .root.Values.initContainers.waitForProduct.enabled }}
 - name: wait-for-product
   image: {{ .root.Values.initContainers.waitForProduct.image }}
-  imagePullPolicy: {{ .root.Values.global.imagePullPolicy }}
+  imagePullPolicy: Always
+  securityContext:
+    {{- include "wallmart.initContainerSecurityContext" .root | nindent 4 }}
   command:
     - sh
     - -c
@@ -135,4 +148,32 @@ MSSQL_SA_PASSWORD
 runAsNonRoot: {{ .Values.podSecurity.runAsNonRoot }}
 runAsUser: {{ .Values.podSecurity.runAsUser }}
 fsGroup: {{ .Values.podSecurity.fsGroup }}
+{{- if not .Values.openshift.enabled }}
+seccompProfile:
+  type: RuntimeDefault
+{{- end }}
+{{- end }}
+
+{{- define "wallmart.containerSecurityContext" -}}
+allowPrivilegeEscalation: false
+capabilities:
+  drop:
+    - ALL
+{{- if not .Values.openshift.enabled }}
+seccompProfile:
+  type: RuntimeDefault
+{{- end }}
+{{- end }}
+
+{{- define "wallmart.initContainerSecurityContext" -}}
+allowPrivilegeEscalation: false
+capabilities:
+  drop:
+    - ALL
+runAsNonRoot: {{ .Values.podSecurity.runAsNonRoot }}
+runAsUser: {{ .Values.podSecurity.runAsUser }}
+{{- if not .Values.openshift.enabled }}
+seccompProfile:
+  type: RuntimeDefault
+{{- end }}
 {{- end }}

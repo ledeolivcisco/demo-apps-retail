@@ -1,0 +1,94 @@
+# Splunk Observability Cloud — OpenShift (Helm)
+# Zero-code instrumentation: OpenTelemetry Operator + Instrumentation CR (not OBI).
+# Logs to Splunk Platform/HEC: disabled (no splunkPlatform; container log collection off).
+# OBI/eBPF: disabled via chart default + explicit obi.enabled=false.
+# Database auto-discovery: agent.discovery disabled.
+# final file name should be values.yaml
+
+distribution: "openshift"
+
+securityContextConstraints:
+  create: true
+
+operatorcrds:
+  install: true
+
+operator:
+  enabled: true
+  replicaCount: 1
+  securityContext:
+    fsGroup:
+    runAsGroup:
+    runAsUser:
+
+instrumentation:
+  enabled: true
+
+# Do not set splunkPlatform.endpoint / token — no log (or metric/trace) export to Splunk Platform/HEC.
+# Chart defaults keep splunkPlatform schema-valid without configuring Platform integration.
+logsCollection:
+  containers:
+    enabled: false
+  journald:
+    enabled: false
+
+clusterReceiver:
+  eventsEnabled: false
+  config:
+    exporters:
+      signalfx:
+        # OpenShift Services carry long annotation values (e.g. openshift.io/description,
+        # AWS LB tags). Splunk Observability dimension properties are capped at 256 chars;
+        # excluding annotation keys avoids 400 ValidationException noise from the dim client.
+        exclude_properties:
+          - property_name: /k8s\.service\.annotation\..*/
+
+agent:
+  discovery:
+    enabled: false
+  config:
+    receivers:
+      kubeletstats:
+        insecure_skip_verify: true
+    exporters:
+      signalfx:
+        ingest_tls:
+          insecure_skip_verify: true
+
+# add this to filter out health, healthz, metrics spans
+    processors:
+      filter/drop_probe_spans:
+        error_mode: ignore
+        traces:
+          span:
+            - 'IsMatch(name, ".*/health(/|\\?|$).*")'
+            - 'IsMatch(name, ".*/healthz(/|\\?|$).*")'
+            - 'IsMatch(name, ".*/metrics(/|\\?|$).*")'
+# add this to filter out health, healthz, metrics spans            
+    service:
+      pipelines:
+        traces:
+          receivers:
+            - otlp
+            - jaeger 
+            - zipkin
+          processors:
+            - memory_limiter
+            - k8s_attributes
+            - filter/drop_probe_spans
+            - batch
+            - resourcedetection
+            - resource
+            - resource/add_environment
+          exporters:
+            - otlp_http
+            - signalfx          
+
+gateway:
+  enabled: false
+
+obi:
+  enabled: false
+
+ 
+

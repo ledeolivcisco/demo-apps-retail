@@ -1,7 +1,6 @@
 global:
   imageRegistry: leandrovo
   imageTag: latest
-  imagePullPolicy: Always
 
 nameOverride: ""
 fullnameOverride: ""
@@ -94,6 +93,8 @@ appConfig:
 
 ecommerceWeb:
   enabled: true
+  image:
+    tag: ""
   replicaCount: 1
   service:
     type: LoadBalancer
@@ -135,6 +136,17 @@ podSecurity:
   runAsNonRoot: true
   runAsUser: 1001
   fsGroup: 1001
+
+# OpenShift / ROSA: non-root nginx, anyuid SCC for SQL Server and Playwright.
+openshift:
+  enabled: false
+  nginx:
+    runAsUser: 101
+    fsGroup: 101
+  ecommerceWeb:
+    containerPort: 8080
+  sqlserver:
+    fsGroup: 10001
 
 initContainers:
   waitForSql:

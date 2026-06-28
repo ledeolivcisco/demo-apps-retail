@@ -1,0 +1,46 @@
+# AppDynamics-focused env for Docker Compose (lab / demo).
+# Copy to docker/.envAppd (gitignored) and fill in your controller credentials:
+#   cp docker/.envAppd.example docker/.envAppd
+#
+# Use with: docker compose --env-file docker/.envAppd up
+# Or merge into docker/.env if you prefer a single file.
+
+# --- AppDynamics Java APM (required for JVM services) ---
+APPDYNAMICS_CONTROLLER_HOST_NAME=
+APPDYNAMICS_AGENT_ACCOUNT_NAME=
+APPDYNAMICS_AGENT_ACCOUNT_ACCESS_KEY=
+APPDYNAMICS_APPLICATION_NAME=wallmart-ecommerce
+
+# --- Image naming ---
+REGISTRY_PREFIX=leandrovo
+IMAGE_TAG=latest
+
+# --- Host ports ---
+WEB_PORT=8080
+PRODUCT_PORT=8081
+CART_PORT=8082
+PAYMENT_PORT=8083
+
+# --- Browser RUM (baked into ecommerce-web at build time) ---
+VITE_OBSERVABILITY_BACKEND=appdynamics
+VITE_APPDYNAMICS_ENABLED=true
+VITE_APPDYNAMICS_APP_KEY=
+VITE_APPDYNAMICS_ADRUM_EXT_URL_HTTPS=https://cdn.appdynamics.com
+VITE_APPDYNAMICS_ADRUM_EXT_URL_HTTP=http://cdn.appdynamics.com
+VITE_APPDYNAMICS_BEACON_URL_HTTPS=https://col.eum-appdynamics.com
+VITE_APPDYNAMICS_BEACON_URL_HTTP=http://col.eum-appdynamics.com
+VITE_APPDYNAMICS_SPA2=true
+
+# --- SQL Server (shared application database) ---
+MSSQL_SA_PASSWORD=YourStrong!Passw0rd
+MSSQL_PORT=1433
+
+# --- Demo / chaos scenarios (product-service only; default off) ---
+WALLMART_DEMO_CHAOS_ENABLED=false
+
+# --- Synthetic E2E loop (profile: synthetic) ---
+# PLAYWRIGHT_BASE_URL=http://ecommerce-web
+# PLAYWRIGHT_LOOP_INTERVAL_SECONDS=30
+# PLAYWRIGHT_WORKERS=4
+# PLAYWRIGHT_FULLY_PARALLEL=true
+# PLAYWRIGHT_SYNTHETIC_PACE_MS=500

@@ -1,0 +1,55 @@
+# ---------------------------------------------------------------------------
+# Splunk OTel Collector — OpenShift sensitive-data redaction
+# ---------------------------------------------------------------------------
+# Enable at install:
+#   ./o11y/openshift/install.sh --with-redaction
+#
+# Data flow (logs):
+#   payment-service stdout → filelog receiver → logs pipeline → redaction/pii → HEC
+#
+# IMPORTANT: Overriding agent.config.service.pipelines replaces chart defaults
+# entirely. This file merges OpenShift trace filters with redaction/pii.
+# ---------------------------------------------------------------------------
+
+agent:
+  config:
+    processors:
+      redaction/pii:
+        allow_all_keys: true
+        redact_all_types: true
+        blocked_values:
+          - '\b4[0-9]{3}[\s-]?[0-9]{4}[\s-]?[0-9]{4}[\s-]?[0-9]{4}\b'
+          - '\b5[1-5][0-9]{2}[\s-]?[0-9]{4}[\s-]?[0-9]{4}[\s-]?[0-9]{4}\b'
+          - '\b[0-9]{3}-[0-9]{2}-[0-9]{4}\b'
+        summary: debug
+
+    service:
+      pipelines:
+        logs:
+          processors:
+            - memory_limiter
+            - k8s_attributes
+            - filter/logs
+            - batch
+            - resourcedetection
+            - resource
+            - resource/logs
+            - redaction/pii
+
+        traces:
+          receivers:
+            - otlp
+            - jaeger
+            - zipkin
+          processors:
+            - memory_limiter
+            - k8s_attributes
+            - filter/drop_probe_spans
+            - batch
+            - resourcedetection
+            - resource
+            - resource/add_environment
+            - redaction/pii
+          exporters:
+            - otlp_http
+            - signalfx

@@ -6,12 +6,14 @@
 #   ./k8s/install.sh --cloud          # cloud defaults (LoadBalancer)
 #   ./k8s/install.sh --local          # require values-local.yaml
 #   ./k8s/install.sh --synthetic      # enable Playwright loop
+#   ./k8s/install.sh --openshift      # OpenShift/ROSA (non-root nginx, anyuid SCC)
 #   ./k8s/install.sh --dry-run        # render manifests only
 #
 # Environment (when not using values-local.yaml):
 #   MSSQL_SA_PASSWORD   SQL Server SA password (required unless in values file)
 #   REGISTRY_PREFIX     Image registry (default: leandrovo)
 #   IMAGE_TAG           Image tag (default: latest)
+#   ECOMMERCE_WEB_IMAGE_TAG  Optional tag override for ecommerce-web only (e.g. splunk, appd)
 #   HELM_RELEASE        Release name (default: wallmart)
 #   HELM_NAMESPACE      Namespace (default: wallmart)
 #
@@ -31,6 +33,7 @@ IMAGE_TAG="${IMAGE_TAG:-latest}"
 
 MODE="auto"
 SYNTHETIC=false
+OPENSHIFT_MODE="${OPENSHIFT:-false}"
 DRY_RUN=false
 
 usage() {
@@ -68,6 +71,10 @@ while [[ $# -gt 0 ]]; do
       SYNTHETIC=true
       shift
       ;;
+    --openshift)
+      OPENSHIFT_MODE=true
+      shift
+      ;;
     --dry-run)
       DRY_RUN=true
       shift
@@ -96,7 +103,6 @@ fi
 
 helm_args=(
   --namespace "${NAMESPACE}"
-  --create-namespace
 )
 
 use_values_local=false
@@ -136,11 +142,28 @@ else
     --set "global.imageTag=${IMAGE_TAG}"
     --set "mssql.password=${MSSQL_SA_PASSWORD}"
   )
+  if [[ -n "${ECOMMERCE_WEB_IMAGE_TAG:-}" ]]; then
+    helm_args+=(--set "ecommerceWeb.image.tag=${ECOMMERCE_WEB_IMAGE_TAG}")
+  fi
 fi
 
 if [[ "${SYNTHETIC}" == true ]]; then
   helm_args+=(--set synthetic.enabled=true)
 fi
+
+if [[ "${OPENSHIFT_MODE}" == "true" ]]; then
+  helm_args+=(--set openshift.enabled=true)
+fi
+
+# Chart templates/namespace.yaml conflicts with --create-namespace when the ns already exists.
+kubectl_bin="kubectl"
+if command -v oc >/dev/null 2>&1 && oc whoami >/dev/null 2>&1; then
+  kubectl_bin="oc"
+fi
+if ! "${kubectl_bin}" get namespace "${NAMESPACE}" >/dev/null 2>&1; then
+  helm_args+=(--create-namespace)
+fi
+helm_args+=(--set "namespace.create=false")
 
 echo "==> helm lint ${CHART}"
 lint_args=(lint "${CHART}")
@@ -159,6 +182,17 @@ fi
 
 echo "==> helm upgrade --install ${RELEASE} ${CHART}"
 helm upgrade --install "${RELEASE}" "${CHART}" "${helm_args[@]}"
+
+openshift_scc=false
+if [[ "${OPENSHIFT_MODE}" == "true" ]]; then
+  openshift_scc=true
+elif [[ "${use_values_local}" == true ]] && grep -A3 '^openshift:' "${VALUES_LOCAL}" 2>/dev/null | grep -qE '^[[:space:]]+enabled:[[:space:]]*true'; then
+  openshift_scc=true
+fi
+if [[ "${openshift_scc}" == "true" ]] && command -v oc >/dev/null 2>&1 && oc whoami >/dev/null 2>&1; then
+  echo "==> apply OpenShift SCC (anyuid for sqlserver, ecommerce-web, playwright-loop)"
+  HELM_NAMESPACE="${NAMESPACE}" "${SCRIPT_DIR}/openshift/apply-scc.sh"
+fi
 
 echo
 echo "Installed release '${RELEASE}' in namespace '${NAMESPACE}'."

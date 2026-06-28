@@ -1,0 +1,18 @@
+# OpenShift cluster overrides (lab HEC TLS, node taints).
+# Copy to values-local.yaml and adjust as needed.
+#
+# Discover taints: oc describe node <node>
+
+clusterName: wallmart-openshift
+environment: dev
+
+splunkPlatform:
+  # Enable for self-signed or lab HEC endpoints.
+  insecureSkipVerify: true
+
+# Example: tolerate a reserved worker pool (uncomment and adjust key/value).
+# tolerations:
+#   - key: "3scale"
+#     operator: "Equal"
+#     value: "reserved"
+#     effect: "NoSchedule"

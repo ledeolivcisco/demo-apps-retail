@@ -18,6 +18,11 @@ spec:
       labels:
         {{- include "wallmart.componentSelectorLabels" (dict "root" . "component" .Values.serviceNames.sqlserver) | nindent 8 }}
     spec:
+      {{- if .Values.openshift.enabled }}
+      serviceAccountName: {{ .Values.serviceNames.sqlserver }}
+      securityContext:
+        fsGroup: {{ .Values.openshift.sqlserver.fsGroup }}
+      {{- end }}
       {{- with .Values.sqlserver.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
@@ -25,7 +30,7 @@ spec:
       containers:
         - name: sqlserver
           image: "{{ .Values.sqlserver.image.repository }}:{{ .Values.sqlserver.image.tag }}"
-          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          imagePullPolicy: Always
           ports:
             - name: mssql
               containerPort: {{ .Values.appConfig.dbPort | int }}

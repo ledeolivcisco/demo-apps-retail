@@ -1,0 +1,112 @@
+# Splunk OpenTelemetry Collector — OpenShift (wallmart demo).
+# Tokens supplied via splunk-otel-credentials secret (see openshift/install.sh).
+# Copy values-local.example.yaml to values-local.yaml for lab overrides.
+
+distribution: openshift
+
+clusterName: wallmart-local
+environment: dev
+
+secret:
+  create: false
+  name: splunk-otel-credentials
+  # Chart hook pod lacks restricted PSA securityContext on OpenShift; install.sh validates keys instead.
+  validateSecret: false
+
+securityContextConstraints:
+  create: true
+
+splunkObservability:
+  realm: us1
+  accessToken: ""
+  metricsEnabled: true
+  tracesEnabled: true
+
+splunkPlatform:
+  endpoint: ""
+  token: ""
+  index: main
+  logsEnabled: true
+  metricsEnabled: false
+  tracesEnabled: false
+  source: kubernetes
+  insecureSkipVerify: false
+
+logsCollection:
+  containers:
+    enabled: true
+  journald:
+    enabled: false
+
+clusterReceiver:
+  enabled: true
+  eventsEnabled: false
+  config:
+    exporters:
+      signalfx:
+        # OpenShift Services carry long annotation values (e.g. openshift.io/description,
+        # AWS LB tags). Splunk Observability dimension properties are capped at 256 chars;
+        # excluding annotation keys avoids 400 ValidationException noise from the dim client.
+        exclude_properties:
+          - property_name: /k8s\.service\.annotation\..*/
+
+operatorcrds:
+  install: true
+
+operator:
+  enabled: true
+  replicaCount: 1
+  admissionWebhooks:
+    autoGenerateCert:
+      enabled: true
+  securityContext:
+    fsGroup:
+    runAsGroup:
+    runAsUser:
+
+instrumentation:
+  enabled: true
+
+agent:
+  discovery:
+    enabled: false
+  config:
+    receivers:
+      kubeletstats:
+        insecure_skip_verify: true
+    exporters:
+      signalfx:
+        ingest_tls:
+          insecure_skip_verify: true
+    processors:
+      filter/drop_probe_spans:
+        error_mode: ignore
+        traces:
+          span:
+            - 'IsMatch(name, ".*/health(/|\\?|$).*")'
+            - 'IsMatch(name, ".*/healthz(/|\\?|$).*")'
+            - 'IsMatch(name, ".*/metrics(/|\\?|$).*")'
+    service:
+      pipelines:
+        traces:
+          receivers:
+            - otlp
+            - jaeger
+            - zipkin
+          processors:
+            - memory_limiter
+            - k8s_attributes
+            - filter/drop_probe_spans
+            - batch
+            - resourcedetection
+            - resource
+            - resource/add_environment
+          exporters:
+            - otlp_http
+            - signalfx
+
+gateway:
+  enabled: false
+
+obi:
+  enabled: false

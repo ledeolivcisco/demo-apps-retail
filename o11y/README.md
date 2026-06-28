@@ -4,6 +4,11 @@ Install the [Splunk Distribution of the OpenTelemetry Collector](https://github.
 
 **Use with:** Kubernetes app deploy ([`k8s/`](../k8s/)) — not Docker Compose (Docker uses AppDynamics).
 
+| Platform | Install path |
+|----------|--------------|
+| Generic Kubernetes (kind, minikube, Docker Desktop) | [`install.sh`](install.sh) + [`values.example.yaml`](values.example.yaml) |
+| OpenShift | [`openshift/install.sh`](openshift/install.sh) + [`openshift/values.example.yaml`](openshift/values.example.yaml) — see [openshift/README.md](openshift/README.md) |
+
 **Destinations:**
 - Splunk Observability Cloud — metrics, traces, Kubernetes cluster metrics
 - Splunk Platform HEC — container logs
@@ -18,7 +23,7 @@ Install the [Splunk Distribution of the OpenTelemetry Collector](https://github.
 
 ## Prerequisites
 
-- Kubernetes 1.25+, Helm 3, kubectl
+- Kubernetes 1.25+ or OpenShift 4.x, Helm 3, kubectl (or `oc` for OpenShift)
 - FreshMart app deployed in namespace `wallmart` ([k8s/install.sh](../k8s/install.sh))
 - Splunk Observability Cloud org access token and realm
 - Splunk Platform HEC token and endpoint
@@ -42,9 +47,12 @@ cp o11y/values-local.example.yaml o11y/values-local.yaml
 
 | Script | Purpose |
 |--------|---------|
-| [install.sh](install.sh) | Add Helm repo, create credentials secret, install collector + operator |
+| [install.sh](install.sh) | Add Helm repo, create credentials secret, install collector + operator (generic K8s) |
+| [openshift/install.sh](openshift/install.sh) | Same for OpenShift (SCC + HEC + `oc`) |
 | [uninstall.sh](uninstall.sh) | Remove Helm release; optional `--delete-secret`, `--delete-namespace` |
+| [openshift/uninstall.sh](openshift/uninstall.sh) | OpenShift uninstall (`oc`) |
 | [verify.sh](verify.sh) | Check agent, cluster receiver, operator, webhooks, Instrumentation CR |
+| [openshift/verify.sh](openshift/verify.sh) | OpenShift checks including HEC secret and log collection |
 | [enable-java-instrumentation.sh](enable-java-instrumentation.sh) | Annotate Java deployments for zero-code injection |
 
 `install.sh` flags: `--dry-run`, `--with-redaction` (layers [values-redaction.example.yaml](values-redaction.example.yaml)).

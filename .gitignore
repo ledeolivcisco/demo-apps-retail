@@ -3,6 +3,10 @@
 .env.*
 !.env.example
 docker/.env
+docker/.env.*
+docker/.envAppd
+!docker/.env.example
+!docker/.envAppd.example
 docker/compose.env
 docker-standalone/.env
 docker-standalone/.envWALM

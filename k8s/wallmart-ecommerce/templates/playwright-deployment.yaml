@@ -16,10 +16,17 @@ spec:
       labels:
         {{- include "wallmart.componentSelectorLabels" (dict "root" . "component" "playwright-loop") | nindent 8 }}
     spec:
+      {{- if .Values.openshift.enabled }}
+      serviceAccountName: playwright-loop
+      {{- end }}
       containers:
         - name: playwright-loop
           image: {{ include "wallmart.appImage" (dict "root" . "repository" "playwright-loop") }}
-          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          imagePullPolicy: Always
+          {{- if .Values.openshift.enabled }}
+          securityContext:
+            allowPrivilegeEscalation: false
+          {{- end }}
           env:
             - name: PLAYWRIGHT_BASE_URL
               value: {{ .Values.synthetic.playwright.baseUrl | quote }}
@@ -38,9 +45,19 @@ spec:
           volumeMounts:
             - name: dshm
               mountPath: /dev/shm
+            {{- if .Values.openshift.enabled }}
+            - name: playwright-work
+              mountPath: /app/test-results
+            - name: playwright-work
+              mountPath: /app/playwright-report
+            {{- end }}
       volumes:
         - name: dshm
           emptyDir:
             medium: Memory
             sizeLimit: {{ .Values.synthetic.shmSize }}
+        {{- if .Values.openshift.enabled }}
+        - name: playwright-work
+          emptyDir: {}
+        {{- end }}
 {{- end }}

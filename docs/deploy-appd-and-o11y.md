@@ -162,6 +162,19 @@ REGISTRY_PREFIX=youruser IMAGE_TAG=splunk ./k8s/install.sh
 
 Deeper guides: [instrument-react-splunk-rum-vite.md](instrument-react-splunk-rum-vite.md) · [o11y/README.md](../o11y/README.md).
 
+### OpenShift
+
+Same tokens in [`o11y/.env`](../o11y/.env) (including HEC). From the repository root:
+
+```bash
+REGISTRY_PREFIX=youruser IMAGE_TAG=splunk ./k8s/install.sh
+./o11y/openshift/install.sh --with-redaction
+./o11y/enable-java-instrumentation.sh
+./o11y/openshift/verify.sh --java
+```
+
+Details: [o11y/openshift/README.md](../o11y/openshift/README.md).
+
 ---
 
 ## Image tag cheat sheet
@@ -191,8 +204,21 @@ Deploy with matching tag:
 # Docker standalone / compose
 IMAGE_TAG=appd
 
-# Kubernetes
+# Kubernetes — all images same tag
 REGISTRY_PREFIX=youruser IMAGE_TAG=splunk ./k8s/install.sh
+
+# Kubernetes — web-only rebuild (backends on latest, storefront on splunk/appd)
+REGISTRY_PREFIX=youruser IMAGE_TAG=latest ECOMMERCE_WEB_IMAGE_TAG=splunk ./k8s/install.sh
+```
+
+Or via Helm values:
+
+```yaml
+global:
+  imageTag: latest
+ecommerceWeb:
+  image:
+    tag: splunk   # or appd
 ```
 
 ---
@@ -204,7 +230,7 @@ REGISTRY_PREFIX=youruser IMAGE_TAG=splunk ./k8s/install.sh
 | Browser RUM missing | Rebuild `ecommerce-web` after changing any `VITE_*` var — RUM is not runtime-configurable |
 | `build-push-scenario.sh` env mismatch | Set `VITE_OBSERVABILITY_BACKEND` to `appdynamics` (for `appd`) or `splunk` (for `splunk`) in `docker/.env` |
 | AppD db-agent fails on Apple Silicon | DB agent image is `linux/amd64` — runs under emulation; JVM services can use native arm64 |
-| Splunk Java agent not injected | Re-run `./o11y/enable-java-instrumentation.sh`; check `./o11y/verify.sh --java` |
+| Splunk Java agent not injected | Re-run `./o11y/enable-java-instrumentation.sh`; check `./o11y/verify.sh --java` (or `./o11y/openshift/verify.sh --java` on OpenShift) |
 | Wrong images pulled on standalone host | Confirm `REGISTRY_PREFIX` and `IMAGE_TAG` match what you pushed |
 
 ## Related docs
@@ -215,5 +241,6 @@ REGISTRY_PREFIX=youruser IMAGE_TAG=splunk ./k8s/install.sh
 | [instrument-react-appdynamics-browser-rum-vite-programmatic.md](instrument-react-appdynamics-browser-rum-vite-programmatic.md) | AppD Browser RUM details |
 | [instrument-react-splunk-rum-vite.md](instrument-react-splunk-rum-vite.md) | Splunk Browser RUM details |
 | [o11y/README.md](../o11y/README.md) | Splunk OTel Collector, redaction, Java auto-instrumentation |
+| [o11y/openshift/README.md](../o11y/openshift/README.md) | Splunk OTel Collector on OpenShift (SCC, HEC) |
 | [k8s/README.md](../k8s/README.md) | Helm chart install options |
 | [docker-standalone/README.md](../docker-standalone/README.md) | Pull-only AppD deployment |

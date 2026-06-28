@@ -36,18 +36,38 @@ spec:
       labels:
         {{- include "wallmart.componentSelectorLabels" (dict "root" . "component" .Values.serviceNames.ecommerceWeb) | nindent 8 }}
     spec:
+      {{- if .Values.openshift.enabled }}
+      serviceAccountName: {{ .Values.serviceNames.ecommerceWeb }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: {{ .Values.openshift.nginx.runAsUser }}
+        fsGroup: {{ .Values.openshift.nginx.fsGroup }}
+      {{- end }}
       containers:
         - name: ecommerce-web
-          image: {{ include "wallmart.appImage" (dict "root" . "repository" "ecommerce-web") }}
-          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          image: {{ include "wallmart.appImage" (dict "root" . "repository" "ecommerce-web" "tag" .Values.ecommerceWeb.image.tag) }}
+          imagePullPolicy: Always
+          {{- if .Values.openshift.enabled }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          {{- end }}
           ports:
             - name: http
-              containerPort: 80
+              containerPort: {{ include "wallmart.ecommerceWebContainerPort" . }}
           volumeMounts:
             - name: nginx-config
               mountPath: /etc/nginx/conf.d/default.conf
               subPath: default.conf
               readOnly: true
+            {{- if .Values.openshift.enabled }}
+            - name: nginx-cache
+              mountPath: /var/cache/nginx
+            - name: nginx-run
+              mountPath: /var/run
+            {{- end }}
           resources:
             {{- toYaml .Values.ecommerceWeb.resources | nindent 12 }}
           readinessProbe:
@@ -64,4 +84,10 @@ spec:
         - name: nginx-config
           configMap:
             name: {{ include "wallmart.fullname" . }}-nginx
+        {{- if .Values.openshift.enabled }}
+        - name: nginx-cache
+          emptyDir: {}
+        - name: nginx-run
+          emptyDir: {}
+        {{- end }}
 {{- end }}

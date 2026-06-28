@@ -23,6 +23,9 @@ From the repository root:
 
 # Deploy with matching tag:
 REGISTRY_PREFIX=your-registry IMAGE_TAG=splunk ./k8s/install.sh
+
+# Or backends on latest, web rebuilt with --web-only:
+REGISTRY_PREFIX=your-registry IMAGE_TAG=latest ECOMMERCE_WEB_IMAGE_TAG=splunk ./k8s/install.sh
 ```
 
 Generic build (any tag):
@@ -74,8 +77,11 @@ helm upgrade --install wallmart ./k8s/wallmart-ecommerce \
   --namespace wallmart --create-namespace \
   --set global.imageRegistry=your-registry \
   --set global.imageTag=latest \
+  --set ecommerceWeb.image.tag=splunk \
   --set mssql.password='YourStrong!Passw0rd'
 ```
+
+`ecommerceWeb.image.tag` overrides `global.imageTag` for the storefront only (Browser RUM is baked at build time). JVM backends always use `global.imageTag`. All containers use `imagePullPolicy: Always`.
 
 Enable the Playwright synthetic loop:
 

@@ -32,6 +32,9 @@ spec:
       labels:
         {{- include "wallmart.componentSelectorLabels" (dict "root" . "component" .Values.serviceNames.paymentService) | nindent 8 }}
     spec:
+      {{- if .Values.openshift.enabled }}
+      serviceAccountName: wallmart-app
+      {{- end }}
       securityContext:
         {{- include "wallmart.podSecurityContext" . | nindent 8 }}
       initContainers:
@@ -40,7 +43,9 @@ spec:
       containers:
         - name: payment-service
           image: {{ include "wallmart.appImage" (dict "root" . "repository" "payment-service") }}
-          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          imagePullPolicy: Always
+          securityContext:
+            {{- include "wallmart.containerSecurityContext" . | nindent 12 }}
           ports:
             - name: http
               containerPort: {{ .Values.paymentService.port }}

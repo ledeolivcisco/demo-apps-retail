@@ -9,11 +9,18 @@ global:
 mssql:
   password: "REPLACE_ME"
 
+# OpenShift / ROSA — required for nginx, SQL Server, and Playwright on restricted SCC.
+openshift:
+  enabled: true
+
 # kind/minikube: LoadBalancer on Docker Desktop — use port 8080 (host :80 is often taken).
+# OpenShift: nginx listens on 8080 (non-root); service port should match.
 ecommerceWeb:
   service:
     type: LoadBalancer
     port: 8080
+  image:
+    # tag: splunk   # or appd — overrides global.imageTag for storefront only
 
 # Docker Desktop / Apple Silicon: cluster nodes are arm64 — do not require amd64 nodeSelector.
 sqlserver:
@@ -22,3 +29,5 @@ sqlserver:
 # Enable synthetic Playwright loop.
 synthetic:
   enabled: true
+  playwright:
+    baseUrl: http://ecommerce-web:8080

@@ -1,2 +1,5 @@
 .env
 values-local.yaml
+openshift/values-local.yaml
+openshift/helm_stdout.txt
+openshift/helm_stderr.txt
