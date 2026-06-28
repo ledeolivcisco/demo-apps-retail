@@ -1,0 +1,7 @@
+apiVersion: v2
+name: wallmart-ecommerce
+description: FreshMart ecommerce demo — SQL Server, Spring Boot microservices, nginx SPA, optional Playwright synthetic loop
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+kubeVersion: ">=1.25.0"

@@ -1,0 +1,42 @@
+# --- Environment / secrets (never commit) ---
+.env
+.env.*
+!.env.example
+docker/.env
+docker/compose.env
+docker-standalone/.env
+docker-standalone/.envWALM
+docker-standalone/.envSELAB
+run/.env
+ecommerce-web/.env
+k8s/wallmart-ecommerce/values-local.yaml
+o11y/.env
+o11y/values-local.yaml
+
+# --- Maven ---
+**/target/
+*.jar
+*.jar.original
+
+# --- Node / frontend ---
+node_modules/
+dist/
+playwright-report/
+test-results/
+blob-report/
+playwright/.cache/
+
+# --- Logs / runtime ---
+*.log
+*.pid
+ecommerce/logs/
+*.tar.gz
+
+# --- OS / IDE ---
+.DS_Store
+.cursor/
+.idea/
+*.iml
+.vscode/
+*.swp
+*~

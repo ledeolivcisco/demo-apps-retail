@@ -1,0 +1,73 @@
+{{- if .Values.productService.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.serviceNames.productService }}
+  namespace: {{ include "wallmart.namespace" . }}
+  labels:
+    {{- include "wallmart.componentLabels" (dict "root" . "component" .Values.serviceNames.productService) | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: {{ .Values.productService.port }}
+      targetPort: http
+  selector:
+    {{- include "wallmart.componentSelectorLabels" (dict "root" . "component" .Values.serviceNames.productService) | nindent 4 }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.serviceNames.productService }}
+  namespace: {{ include "wallmart.namespace" . }}
+  labels:
+    {{- include "wallmart.componentLabels" (dict "root" . "component" .Values.serviceNames.productService) | nindent 4 }}
+spec:
+  replicas: {{ .Values.productService.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "wallmart.componentSelectorLabels" (dict "root" . "component" .Values.serviceNames.productService) | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "wallmart.componentSelectorLabels" (dict "root" . "component" .Values.serviceNames.productService) | nindent 8 }}
+    spec:
+      securityContext:
+        {{- include "wallmart.podSecurityContext" . | nindent 8 }}
+      initContainers:
+        {{- include "wallmart.waitForSqlInitContainer" (dict "root" .) | nindent 8 }}
+      containers:
+        - name: product-service
+          image: {{ include "wallmart.appImage" (dict "root" . "repository" "product-service") }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.productService.port }}
+          env:
+            {{- include "wallmart.dbEnv" (dict "root" . "dbBootstrap" .Values.productService.dbBootstrap) | nindent 12 }}
+            - name: WALLMART_DEMO_CHAOS_ENABLED
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "wallmart.fullname" . }}-app-config
+                  key: WALLMART_DEMO_CHAOS_ENABLED
+          resources:
+            {{- toYaml .Values.productService.resources | nindent 12 }}
+          startupProbe:
+            httpGet:
+              path: {{ .Values.productService.probes.path }}
+              port: http
+            periodSeconds: 10
+            failureThreshold: 30
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.productService.probes.path }}
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.productService.probes.path }}
+              port: http
+            periodSeconds: 30
+            timeoutSeconds: 5
+{{- end }}

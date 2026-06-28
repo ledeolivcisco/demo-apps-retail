@@ -1,0 +1,2 @@
+com.wallmart.db.DbAutoConfiguration
+com.wallmart.db.DbActuatorAutoConfiguration

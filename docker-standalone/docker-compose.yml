@@ -1,0 +1,181 @@
+# Pre-built images only — no build context. Copy this folder to a host, configure .env, then:
+#   docker compose up -d
+#
+# Synthetic loop (optional): docker compose --profile synthetic up -d
+# Requires a pushed image: ${REGISTRY_PREFIX}/playwright-loop:${IMAGE_TAG}
+#
+# AppDynamics DB Visibility: db-agent (26.4.0-5606, linux/amd64) registers as SQLDBSales (hostname sqldbsales).
+# machine-agent uses fixed hostname wallmart-docker-host. sqlserver uses hostname sqlserver.
+# After up, create an MSSQL collector in the Controller UI (host sqlserver:1433, user sa,
+# password MSSQL_SA_PASSWORD from .env). See README.md.
+
+name: wallmart-ecommerce
+
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    platform: linux/amd64
+    container_name: wallmart-sqlserver
+    hostname: sqlserver
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD}
+    ports:
+      - "${MSSQL_PORT:-1433}:1433"
+    healthcheck:
+      test: /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$$MSSQL_SA_PASSWORD" -C -Q "SELECT 1" || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  db-agent:
+    image: appdynamics/db-agent:26.4.0-5606
+    platform: linux/amd64
+    container_name: wallmart-appd-db-agent
+    hostname: sqldbsales
+    pull_policy: ${COMPOSE_PULL_POLICY:-missing}
+    restart: unless-stopped
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    environment:
+      APPDYNAMICS_CONTROLLER_HOST_NAME: ${APPDYNAMICS_CONTROLLER_HOST_NAME}
+      APPDYNAMICS_CONTROLLER_PORT: ${APPDYNAMICS_CONTROLLER_PORT:-443}
+      APPDYNAMICS_CONTROLLER_SSL_ENABLED: ${APPDYNAMICS_CONTROLLER_SSL_ENABLED:-true}
+      APPDYNAMICS_AGENT_ACCOUNT_NAME: ${APPDYNAMICS_AGENT_ACCOUNT_NAME}
+      APPDYNAMICS_AGENT_ACCOUNT_ACCESS_KEY: ${APPDYNAMICS_AGENT_ACCOUNT_ACCESS_KEY}
+      APPDYNAMICS_DB_AGENT_NAME: SQLDBSales
+      APPDYNAMICS_DB_PROPERTIES: ${APPDYNAMICS_DB_PROPERTIES:--Ddbagent.telemetry.enabled=true}
+
+  splunk-java-agent:
+    image: appdynamics/java-agent:26.4.0
+    container_name: wallmart-appd-agent
+    restart: "no"
+    volumes:
+      - appd_java_agent:/opt/appdynamics
+
+  machine-agent:
+    # Use the root variant so the agent can access /var/run/docker.sock
+    image: appdynamics/machine-agent:26.4.0-root
+    container_name: wallmart-appd-machine-agent
+    hostname: wallmart-docker-host
+    pull_policy: ${COMPOSE_PULL_POLICY:-missing}
+    restart: unless-stopped
+    user: "0:0"
+    environment:
+      APPDYNAMICS_CONTROLLER_HOST_NAME: ${APPDYNAMICS_CONTROLLER_HOST_NAME}
+      APPDYNAMICS_CONTROLLER_PORT: ${APPDYNAMICS_CONTROLLER_PORT:-443}
+      APPDYNAMICS_CONTROLLER_SSL_ENABLED: ${APPDYNAMICS_CONTROLLER_SSL_ENABLED:-true}
+      APPDYNAMICS_AGENT_ACCOUNT_NAME: ${APPDYNAMICS_AGENT_ACCOUNT_NAME}
+      APPDYNAMICS_AGENT_ACCOUNT_ACCESS_KEY: ${APPDYNAMICS_AGENT_ACCOUNT_ACCESS_KEY}
+      APPDYNAMICS_AGENT_UNIQUE_HOST_ID: wallmart-docker-host
+      APPDYNAMICS_SIM_ENABLED: ${APPDYNAMICS_SIM_ENABLED:-true}
+      APPDYNAMICS_DOCKER_ENABLED: ${APPDYNAMICS_DOCKER_ENABLED:-true}
+    volumes:
+      - /proc:/hostroot/proc:ro
+      - /sys:/hostroot/sys:ro
+      - /etc:/hostroot/etc:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  product-service:
+    image: ${REGISTRY_PREFIX:-leandrovo}/product-service:${IMAGE_TAG:-latest}
+    pull_policy: ${COMPOSE_PULL_POLICY:-missing}
+    ports:
+      - "${PRODUCT_PORT:-8081}:8081"
+    volumes:
+      - appd_java_agent:/opt/appdynamics
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+      splunk-java-agent:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8081/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    environment:
+      JAVA_TOOL_OPTIONS: "-javaagent:/opt/appdynamics/javaagent.jar -Dappdynamics.agent.runtime.dir=/tmp/appdynamics -Dappdynamics.agent.applicationName=${APPDYNAMICS_APPLICATION_NAME:-wallmart-ecommerce} -Dappdynamics.agent.tierName=${APPDYNAMICS_AGENT_TIER_NAME_PRODUCT:-product-service} -Dappdynamics.agent.nodeName=${APPDYNAMICS_AGENT_NODE_NAME_PRODUCT:-product-1} -Dappdynamics.controller.hostName=${APPDYNAMICS_CONTROLLER_HOST_NAME} -Dappdynamics.controller.port=${APPDYNAMICS_CONTROLLER_PORT:-443} -Dappdynamics.controller.ssl.enabled=${APPDYNAMICS_CONTROLLER_SSL_ENABLED:-true} -Dappdynamics.agent.accountName=${APPDYNAMICS_AGENT_ACCOUNT_NAME} -Dappdynamics.agent.accountAccessKey=${APPDYNAMICS_AGENT_ACCOUNT_ACCESS_KEY}"
+      WALLMART_DB_HOST: sqlserver
+      WALLMART_DB_PORT: "1433"
+      WALLMART_DB_NAME: wallmart
+      WALLMART_DB_USER: sa
+      WALLMART_DB_PASSWORD: ${MSSQL_SA_PASSWORD}
+      WALLMART_DB_BOOTSTRAP: "true"
+      WALLMART_DEMO_CHAOS_ENABLED: "${WALLMART_DEMO_CHAOS_ENABLED:-false}"
+
+  cart-service:
+    image: ${REGISTRY_PREFIX:-leandrovo}/cart-service:${IMAGE_TAG:-latest}
+    pull_policy: ${COMPOSE_PULL_POLICY:-missing}
+    ports:
+      - "${CART_PORT:-8082}:8082"
+    volumes:
+      - appd_java_agent:/opt/appdynamics
+    depends_on:
+      product-service:
+        condition: service_healthy
+      splunk-java-agent:
+        condition: service_started
+    environment:
+      JAVA_TOOL_OPTIONS: "-javaagent:/opt/appdynamics/javaagent.jar -Dappdynamics.agent.runtime.dir=/tmp/appdynamics -Dappdynamics.agent.applicationName=${APPDYNAMICS_APPLICATION_NAME:-wallmart-ecommerce} -Dappdynamics.agent.tierName=${APPDYNAMICS_AGENT_TIER_NAME_CART:-cart-service} -Dappdynamics.agent.nodeName=${APPDYNAMICS_AGENT_NODE_NAME_CART:-cart-1} -Dappdynamics.controller.hostName=${APPDYNAMICS_CONTROLLER_HOST_NAME} -Dappdynamics.controller.port=${APPDYNAMICS_CONTROLLER_PORT:-443} -Dappdynamics.controller.ssl.enabled=${APPDYNAMICS_CONTROLLER_SSL_ENABLED:-true} -Dappdynamics.agent.accountName=${APPDYNAMICS_AGENT_ACCOUNT_NAME} -Dappdynamics.agent.accountAccessKey=${APPDYNAMICS_AGENT_ACCOUNT_ACCESS_KEY}"
+      WALLMART_PRODUCT_SERVICE_BASE_URL: http://product-service:8081
+      WALLMART_PAYMENT_SERVICE_BASE_URL: http://payment-service:8083
+      WALLMART_DB_HOST: sqlserver
+      WALLMART_DB_PORT: "1433"
+      WALLMART_DB_NAME: wallmart
+      WALLMART_DB_USER: sa
+      WALLMART_DB_PASSWORD: ${MSSQL_SA_PASSWORD}
+      WALLMART_DB_BOOTSTRAP: "false"
+
+  payment-service:
+    image: ${REGISTRY_PREFIX:-leandrovo}/payment-service:${IMAGE_TAG:-latest}
+    pull_policy: ${COMPOSE_PULL_POLICY:-missing}
+    ports:
+      - "${PAYMENT_PORT:-8083}:8083"
+    volumes:
+      - appd_java_agent:/opt/appdynamics
+    depends_on:
+      product-service:
+        condition: service_healthy
+      splunk-java-agent:
+        condition: service_started
+    environment:
+      JAVA_TOOL_OPTIONS: "-javaagent:/opt/appdynamics/javaagent.jar -Dappdynamics.agent.runtime.dir=/tmp/appdynamics -Dappdynamics.agent.applicationName=${APPDYNAMICS_APPLICATION_NAME:-wallmart-ecommerce} -Dappdynamics.agent.tierName=${APPDYNAMICS_AGENT_TIER_NAME_PAYMENT:-payment-service} -Dappdynamics.agent.nodeName=${APPDYNAMICS_AGENT_NODE_NAME_PAYMENT:-payment-1} -Dappdynamics.controller.hostName=${APPDYNAMICS_CONTROLLER_HOST_NAME} -Dappdynamics.controller.port=${APPDYNAMICS_CONTROLLER_PORT:-443} -Dappdynamics.controller.ssl.enabled=${APPDYNAMICS_CONTROLLER_SSL_ENABLED:-true} -Dappdynamics.agent.accountName=${APPDYNAMICS_AGENT_ACCOUNT_NAME} -Dappdynamics.agent.accountAccessKey=${APPDYNAMICS_AGENT_ACCOUNT_ACCESS_KEY}"
+      WALLMART_DB_HOST: sqlserver
+      WALLMART_DB_PORT: "1433"
+      WALLMART_DB_NAME: wallmart
+      WALLMART_DB_USER: sa
+      WALLMART_DB_PASSWORD: ${MSSQL_SA_PASSWORD}
+      WALLMART_DB_BOOTSTRAP: "false"
+
+  ecommerce-web:
+    image: ${REGISTRY_PREFIX:-leandrovo}/ecommerce-web:${IMAGE_TAG:-latest}
+    pull_policy: ${COMPOSE_PULL_POLICY:-missing}
+    ports:
+      - "${WEB_PORT:-8080}:80"
+    depends_on:
+      - product-service
+      - cart-service
+      - payment-service
+
+  playwright-loop:
+    profiles:
+      - synthetic
+    image: ${REGISTRY_PREFIX:-leandrovo}/playwright-loop:${IMAGE_TAG:-latest}
+    pull_policy: ${COMPOSE_PULL_POLICY:-missing}
+    container_name: wallmart-playwright-loop
+    shm_size: "1gb"
+    environment:
+      PLAYWRIGHT_BASE_URL: "${PLAYWRIGHT_BASE_URL:-http://ecommerce-web}"
+      PLAYWRIGHT_LOOP_INTERVAL_SECONDS: "${PLAYWRIGHT_LOOP_INTERVAL_SECONDS:-30}"
+      PLAYWRIGHT_WORKERS: "${PLAYWRIGHT_WORKERS:-4}"
+      PLAYWRIGHT_FULLY_PARALLEL: "${PLAYWRIGHT_FULLY_PARALLEL:-true}"
+      PLAYWRIGHT_SYNTHETIC_PACE_MS: "${PLAYWRIGHT_SYNTHETIC_PACE_MS:-500}"
+    restart: unless-stopped
+    depends_on:
+      - ecommerce-web
+
+volumes:
+  appd_java_agent:

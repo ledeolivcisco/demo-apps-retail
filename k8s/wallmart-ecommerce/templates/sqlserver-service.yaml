@@ -1,0 +1,17 @@
+{{- if .Values.sqlserver.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.serviceNames.sqlserver }}
+  namespace: {{ include "wallmart.namespace" . }}
+  labels:
+    {{- include "wallmart.componentLabels" (dict "root" . "component" .Values.serviceNames.sqlserver) | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - name: mssql
+      port: {{ .Values.appConfig.dbPort | int }}
+      targetPort: mssql
+  selector:
+    {{- include "wallmart.componentSelectorLabels" (dict "root" . "component" .Values.serviceNames.sqlserver) | nindent 4 }}
+{{- end }}

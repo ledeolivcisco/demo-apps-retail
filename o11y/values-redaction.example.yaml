@@ -1,0 +1,72 @@
+# ---------------------------------------------------------------------------
+# Splunk OTel Collector — sensitive-data redaction
+# ---------------------------------------------------------------------------
+# Workshop reference:
+# https://splunk.github.io/observability-workshop/en/ninja-workshops/foundations/3-opentelemetry-collector-workshops/2-advanced-collector/4-sensitive-data/
+#
+# Enable at install:
+#   ./o11y/install.sh --with-redaction
+#
+# Or layer manually:
+#   helm upgrade --install splunk-otel-collector splunk-otel-collector-chart/splunk-otel-collector \
+#     -f o11y/values.example.yaml \
+#     -f o11y/values-redaction.example.yaml \
+#     ...
+#
+# Data flow (logs):
+#   payment-service stdout → filelog receiver → logs pipeline → redaction/pii → HEC
+#
+# Pod logs (kubectl logs) still show raw fake PII; HEC receives redacted data.
+#
+# IMPORTANT: Overriding agent.config.service.pipelines.logs.processors replaces
+# the chart default list entirely. Copy defaults below, then add redaction/pii.
+# ---------------------------------------------------------------------------
+
+agent:
+  config:
+    processors:
+      # Step 1 — define the redaction processor
+      redaction/pii:
+        # Keep all attributes; only mask VALUES matching blocked_values regexes.
+        # If false, only allowed_keys are kept and everything else is dropped.
+        allow_all_keys: true
+
+        # Scan non-string fields too (e.g. numeric-looking PII).
+        redact_all_types: true
+
+        # Step 2 — regex patterns to mask (replaced with ****)
+        blocked_values:
+          # Visa: 4xxx xxxx xxxx xxxx (optional spaces/dashes)
+          - '\b4[0-9]{3}[\s-]?[0-9]{4}[\s-]?[0-9]{4}[\s-]?[0-9]{4}\b'
+
+          # MasterCard: 51–55xx xxxx xxxx xxxx
+          - '\b5[1-5][0-9]{2}[\s-]?[0-9]{4}[\s-]?[0-9]{4}[\s-]?[0-9]{4}\b'
+
+          # US SSN: XXX-XX-XXXX (matches payment-service demo 900-XX-XXXX)
+          - '\b[0-9]{3}-[0-9]{2}-[0-9]{4}\b'
+
+        # debug | info | silent — use debug while validating, silent in prod
+        summary: debug
+
+    service:
+      pipelines:
+        # Step 3 — wire redaction/pii into pipelines before export
+        logs:
+          processors:
+            - memory_limiter
+            - k8sattributes
+            - filter/logs
+            - batch
+            - resourcedetection
+            - resource
+            - resource/logs
+            - redaction/pii
+
+        traces:
+          processors:
+            - memory_limiter
+            - k8sattributes
+            - batch
+            - resourcedetection
+            - resource
+            - redaction/pii

@@ -1,0 +1,145 @@
+global:
+  imageRegistry: leandrovo
+  imageTag: latest
+  imagePullPolicy: Always
+
+nameOverride: ""
+fullnameOverride: ""
+
+namespace:
+  create: true
+  name: wallmart
+
+serviceNames:
+  sqlserver: sqlserver
+  productService: product-service
+  cartService: cart-service
+  paymentService: payment-service
+  ecommerceWeb: ecommerce-web
+
+sqlserver:
+  enabled: true
+  image:
+    repository: mcr.microsoft.com/mssql/server
+    tag: "2022-latest"
+  acceptEula: "Y"
+  storageSize: 10Gi
+  storageClassName: ""
+  # MSSQL image is linux/amd64 only. Leave empty for local arm64 clusters (Docker Desktop
+  # runs amd64 via emulation). Set kubernetes.io/arch: amd64 when using a dedicated amd64 node pool.
+  nodeSelector: {}
+  resources:
+    requests:
+      memory: 2Gi
+      cpu: 500m
+    limits:
+      memory: 4Gi
+      cpu: "2"
+
+mssql:
+  createSecret: true
+  existingSecret: ""
+  existingSecretPasswordKey: MSSQL_SA_PASSWORD
+  password: ""
+
+productService:
+  enabled: true
+  replicaCount: 1
+  port: 8081
+  dbBootstrap: true
+  resources:
+    requests:
+      memory: 256Mi
+      cpu: 250m
+    limits:
+      memory: 512Mi
+      cpu: 500m
+  probes:
+    path: /actuator/health
+
+cartService:
+  enabled: true
+  replicaCount: 1
+  port: 8082
+  dbBootstrap: false
+  resources:
+    requests:
+      memory: 256Mi
+      cpu: 250m
+    limits:
+      memory: 512Mi
+      cpu: 500m
+
+paymentService:
+  enabled: true
+  replicaCount: 1
+  port: 8083
+  dbBootstrap: false
+  resources:
+    requests:
+      memory: 256Mi
+      cpu: 250m
+    limits:
+      memory: 512Mi
+      cpu: 500m
+
+appConfig:
+  dbHost: sqlserver
+  dbPort: "1433"
+  dbName: wallmart
+  dbUser: sa
+  productServiceBaseUrl: http://product-service:8081
+  paymentServiceBaseUrl: http://payment-service:8083
+  demoChaosEnabled: false
+
+ecommerceWeb:
+  enabled: true
+  replicaCount: 1
+  service:
+    type: LoadBalancer
+    port: 80
+    nodePort: null
+  resources:
+    requests:
+      memory: 64Mi
+      cpu: 50m
+    limits:
+      memory: 128Mi
+      cpu: 200m
+
+ingress:
+  enabled: false
+  className: nginx
+  host: wallmart.local
+  annotations: {}
+
+synthetic:
+  enabled: false
+  replicaCount: 1
+  playwright:
+    baseUrl: http://ecommerce-web
+    loopIntervalSeconds: 30
+    workers: 4
+    fullyParallel: true
+    syntheticPaceMs: 500
+  shmSize: 1Gi
+  resources:
+    requests:
+      memory: 1Gi
+      cpu: 500m
+    limits:
+      memory: 2Gi
+      cpu: "2"
+
+podSecurity:
+  runAsNonRoot: true
+  runAsUser: 1001
+  fsGroup: 1001
+
+initContainers:
+  waitForSql:
+    enabled: true
+    image: busybox:1.36
+  waitForProduct:
+    enabled: true
+    image: busybox:1.36

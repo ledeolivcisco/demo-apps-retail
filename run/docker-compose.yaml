@@ -1,0 +1,32 @@
+services:
+
+# APM - AGENT VOLUME (SIDECAR)
+  splunk-java-agent:
+    image: appdynamics/java-agent:26.4.0
+    container_name: appd-agent
+    restart: "no"
+    volumes:
+      - appd_java_agent:/opt/appdynamics
+
+  load:
+    image: leandrovo/stonks-synth:latest
+    restart: always
+    depends_on:
+      - mygame
+
+  mygame:
+    image: leandrovo/stonks:appdselab
+#    image: leandrovo/stonks:appdtrial    
+    restart: always
+    ports:
+      - "9090:9090"
+    volumes:
+      - appd_java_agent:/opt/appdynamics
+    environment:
+      JAVA_TOOL_OPTIONS: "-javaagent:/opt/appdynamics/javaagent.jar -Dappdynamics.agent.applicationName=${APPDYNAMICS_APPLICATION_NAME:-mygameApp} -Dappdynamics.agent.tierName=${APPDYNAMICS_AGENT_TIER_NAME:-mygame-api} -Dappdynamics.agent.nodeName=${APPDYNAMICS_AGENT_NODE_NAME:-mygame-1} -Dappdynamics.controller.hostName=${APPDYNAMICS_CONTROLLER_HOST_NAME} -Dappdynamics.controller.port=${APPDYNAMICS_CONTROLLER_PORT:-443} -Dappdynamics.controller.ssl.enabled=${APPDYNAMICS_CONTROLLER_SSL_ENABLED:-true} -Dappdynamics.agent.accountName=${APPDYNAMICS_AGENT_ACCOUNT_NAME} -Dappdynamics.agent.accountAccessKey=${APPDYNAMICS_AGENT_ACCOUNT_ACCESS_KEY}"
+
+#APM ADD AGENT VOLUME
+volumes:
+  appd_java_agent:
+
+

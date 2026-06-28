@@ -1,0 +1,9 @@
+# Local cluster overrides (kind / minikube / Docker Desktop K8s).
+# Copy to values-local.yaml and adjust as needed.
+
+clusterName: wallmart-local
+environment: dev
+
+splunkPlatform:
+  # Enable for self-signed or lab HEC endpoints.
+  insecureSkipVerify: true

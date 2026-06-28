@@ -1,0 +1,67 @@
+{{- if .Values.ecommerceWeb.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.serviceNames.ecommerceWeb }}
+  namespace: {{ include "wallmart.namespace" . }}
+  labels:
+    {{- include "wallmart.componentLabels" (dict "root" . "component" .Values.serviceNames.ecommerceWeb) | nindent 4 }}
+spec:
+  type: {{ .Values.ecommerceWeb.service.type }}
+  ports:
+    - name: http
+      port: {{ .Values.ecommerceWeb.service.port }}
+      targetPort: http
+      protocol: TCP
+      {{- if and (eq .Values.ecommerceWeb.service.type "NodePort") .Values.ecommerceWeb.service.nodePort }}
+      nodePort: {{ .Values.ecommerceWeb.service.nodePort }}
+      {{- end }}
+  selector:
+    {{- include "wallmart.componentSelectorLabels" (dict "root" . "component" .Values.serviceNames.ecommerceWeb) | nindent 4 }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.serviceNames.ecommerceWeb }}
+  namespace: {{ include "wallmart.namespace" . }}
+  labels:
+    {{- include "wallmart.componentLabels" (dict "root" . "component" .Values.serviceNames.ecommerceWeb) | nindent 4 }}
+spec:
+  replicas: {{ .Values.ecommerceWeb.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "wallmart.componentSelectorLabels" (dict "root" . "component" .Values.serviceNames.ecommerceWeb) | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "wallmart.componentSelectorLabels" (dict "root" . "component" .Values.serviceNames.ecommerceWeb) | nindent 8 }}
+    spec:
+      containers:
+        - name: ecommerce-web
+          image: {{ include "wallmart.appImage" (dict "root" . "repository" "ecommerce-web") }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - name: http
+              containerPort: 80
+          volumeMounts:
+            - name: nginx-config
+              mountPath: /etc/nginx/conf.d/default.conf
+              subPath: default.conf
+              readOnly: true
+          resources:
+            {{- toYaml .Values.ecommerceWeb.resources | nindent 12 }}
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            periodSeconds: 30
+      volumes:
+        - name: nginx-config
+          configMap:
+            name: {{ include "wallmart.fullname" . }}-nginx
+{{- end }}

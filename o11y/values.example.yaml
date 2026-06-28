@@ -1,0 +1,46 @@
+# Base Splunk OpenTelemetry Collector values for the wallmart demo.
+# Tokens are supplied via the splunk-otel-credentials secret (see install.sh).
+# Copy values-local.example.yaml to values-local.yaml for cluster-specific overrides.
+
+clusterName: wallmart-local
+environment: dev
+
+secret:
+  create: false
+  name: splunk-otel-credentials
+  validateSecret: true
+
+splunkObservability:
+  realm: us1
+  accessToken: ""
+  metricsEnabled: true
+  tracesEnabled: true
+
+splunkPlatform:
+  endpoint: ""
+  token: ""
+  index: main
+  logsEnabled: true
+  metricsEnabled: false
+  tracesEnabled: false
+  source: kubernetes
+  insecureSkipVerify: false
+
+clusterReceiver:
+  enabled: true
+
+logsCollection:
+  containers:
+    enabled: true
+
+operatorcrds:
+  install: true
+
+operator:
+  enabled: true
+  admissionWebhooks:
+    autoGenerateCert:
+      enabled: true
+
+instrumentation:
+  enabled: true

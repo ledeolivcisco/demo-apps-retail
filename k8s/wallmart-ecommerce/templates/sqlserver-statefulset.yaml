@@ -1,0 +1,69 @@
+{{- if .Values.sqlserver.enabled }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ .Values.serviceNames.sqlserver }}
+  namespace: {{ include "wallmart.namespace" . }}
+  labels:
+    {{- include "wallmart.componentLabels" (dict "root" . "component" .Values.serviceNames.sqlserver) | nindent 4 }}
+spec:
+  serviceName: {{ .Values.serviceNames.sqlserver }}
+  replicas: 1
+  selector:
+    matchLabels:
+      "app.kubernetes.io/name": {{ .Values.serviceNames.sqlserver | quote }}
+      "app.kubernetes.io/instance": {{ .Release.Name | quote }}
+  template:
+    metadata:
+      labels:
+        {{- include "wallmart.componentSelectorLabels" (dict "root" . "component" .Values.serviceNames.sqlserver) | nindent 8 }}
+    spec:
+      {{- with .Values.sqlserver.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: sqlserver
+          image: "{{ .Values.sqlserver.image.repository }}:{{ .Values.sqlserver.image.tag }}"
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - name: mssql
+              containerPort: {{ .Values.appConfig.dbPort | int }}
+          env:
+            - name: ACCEPT_EULA
+              value: {{ .Values.sqlserver.acceptEula | quote }}
+            - name: MSSQL_SA_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "wallmart.mssqlSecretName" . }}
+                  key: {{ include "wallmart.mssqlPasswordKey" . }}
+          volumeMounts:
+            - name: data
+              mountPath: /var/opt/mssql
+          resources:
+            {{- toYaml .Values.sqlserver.resources | nindent 12 }}
+          startupProbe:
+            tcpSocket:
+              port: mssql
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 30
+          livenessProbe:
+            tcpSocket:
+              port: mssql
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        {{- if .Values.sqlserver.storageClassName }}
+        storageClassName: {{ .Values.sqlserver.storageClassName | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.sqlserver.storageSize | quote }}
+{{- end }}

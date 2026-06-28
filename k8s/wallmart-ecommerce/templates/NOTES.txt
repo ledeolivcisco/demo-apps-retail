@@ -1,0 +1,49 @@
+FreshMart ecommerce has been deployed.
+
+Release: {{ .Release.Name }}
+Namespace: {{ include "wallmart.namespace" . }}
+
+Storefront service ({{ .Values.serviceNames.ecommerceWeb }}):
+  Type: {{ .Values.ecommerceWeb.service.type }}
+
+{{- if eq .Values.ecommerceWeb.service.type "LoadBalancer" }}
+
+  Get the external URL:
+    kubectl get svc {{ .Values.serviceNames.ecommerceWeb }} -n {{ include "wallmart.namespace" . }}
+
+  Wait for EXTERNAL-IP, then open http://<EXTERNAL-IP> in your browser.
+
+{{- else if eq .Values.ecommerceWeb.service.type "NodePort" }}
+
+  Get the node port:
+    kubectl get svc {{ .Values.serviceNames.ecommerceWeb }} -n {{ include "wallmart.namespace" . }}
+
+{{- else }}
+
+  Port-forward (local / kind / minikube):
+    kubectl port-forward svc/{{ .Values.serviceNames.ecommerceWeb }} 8080:{{ .Values.ecommerceWeb.service.port }} -n {{ include "wallmart.namespace" . }}
+
+  Then open http://localhost:8080
+
+{{- end }}
+
+Check pod status:
+  kubectl get pods -n {{ include "wallmart.namespace" . }}
+
+View application logs:
+  kubectl logs -n {{ include "wallmart.namespace" . }} deploy/{{ .Values.serviceNames.productService }} -f
+  kubectl logs -n {{ include "wallmart.namespace" . }} deploy/{{ .Values.serviceNames.cartService }} -f
+  kubectl logs -n {{ include "wallmart.namespace" . }} deploy/{{ .Values.serviceNames.paymentService }} -f
+
+{{- if .Values.synthetic.enabled }}
+
+Synthetic Playwright loop:
+  kubectl logs -n {{ include "wallmart.namespace" . }} deploy/playwright-loop -f
+
+{{- end }}
+
+Uninstall:
+  helm uninstall {{ .Release.Name }} -n {{ include "wallmart.namespace" . }}
+
+Note: SQL Server PVC is retained after uninstall. Delete manually if needed:
+  kubectl delete pvc -n {{ include "wallmart.namespace" . }} -l app.kubernetes.io/name={{ .Values.serviceNames.sqlserver }}

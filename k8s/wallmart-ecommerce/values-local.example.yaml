@@ -1,0 +1,24 @@
+# Copy to values-local.yaml (gitignored) for local overrides.
+#   cp values-local.example.yaml values-local.yaml
+
+global:
+  imageRegistry: leandrovo
+  imageTag: latest
+
+# Required at install — use a strong password (MSSQL complexity rules apply).
+mssql:
+  password: "REPLACE_ME"
+
+# kind/minikube: LoadBalancer on Docker Desktop — use port 8080 (host :80 is often taken).
+ecommerceWeb:
+  service:
+    type: LoadBalancer
+    port: 8080
+
+# Docker Desktop / Apple Silicon: cluster nodes are arm64 — do not require amd64 nodeSelector.
+sqlserver:
+  nodeSelector: {}
+
+# Enable synthetic Playwright loop.
+synthetic:
+  enabled: true

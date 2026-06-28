@@ -1,0 +1,12 @@
+.git
+**/.DS_Store
+**/node_modules
+ecommerce-web/node_modules
+ecommerce-web/dist
+ecommerce-web/.env
+ecommerce-web/.env.*
+!ecommerce-web/.env.example
+ecommerce/product-service/target
+ecommerce/cart-service/target
+ecommerce/payment-service/target
+ecommerce/logs

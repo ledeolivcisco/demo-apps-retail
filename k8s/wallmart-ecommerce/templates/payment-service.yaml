@@ -1,0 +1,64 @@
+{{- if .Values.paymentService.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.serviceNames.paymentService }}
+  namespace: {{ include "wallmart.namespace" . }}
+  labels:
+    {{- include "wallmart.componentLabels" (dict "root" . "component" .Values.serviceNames.paymentService) | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: {{ .Values.paymentService.port }}
+      targetPort: http
+  selector:
+    {{- include "wallmart.componentSelectorLabels" (dict "root" . "component" .Values.serviceNames.paymentService) | nindent 4 }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.serviceNames.paymentService }}
+  namespace: {{ include "wallmart.namespace" . }}
+  labels:
+    {{- include "wallmart.componentLabels" (dict "root" . "component" .Values.serviceNames.paymentService) | nindent 4 }}
+spec:
+  replicas: {{ .Values.paymentService.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "wallmart.componentSelectorLabels" (dict "root" . "component" .Values.serviceNames.paymentService) | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "wallmart.componentSelectorLabels" (dict "root" . "component" .Values.serviceNames.paymentService) | nindent 8 }}
+    spec:
+      securityContext:
+        {{- include "wallmart.podSecurityContext" . | nindent 8 }}
+      initContainers:
+        {{- include "wallmart.waitForSqlInitContainer" (dict "root" .) | nindent 8 }}
+        {{- include "wallmart.waitForProductInitContainer" (dict "root" .) | nindent 8 }}
+      containers:
+        - name: payment-service
+          image: {{ include "wallmart.appImage" (dict "root" . "repository" "payment-service") }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.paymentService.port }}
+          env:
+            {{- include "wallmart.dbEnv" (dict "root" . "dbBootstrap" .Values.paymentService.dbBootstrap) | nindent 12 }}
+          resources:
+            {{- toYaml .Values.paymentService.resources | nindent 12 }}
+          startupProbe:
+            tcpSocket:
+              port: http
+            periodSeconds: 10
+            failureThreshold: 30
+          readinessProbe:
+            tcpSocket:
+              port: http
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: http
+            periodSeconds: 30
+{{- end }}

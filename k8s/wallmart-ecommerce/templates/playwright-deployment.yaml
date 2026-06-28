@@ -1,0 +1,46 @@
+{{- if .Values.synthetic.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: playwright-loop
+  namespace: {{ include "wallmart.namespace" . }}
+  labels:
+    {{- include "wallmart.componentLabels" (dict "root" . "component" "playwright-loop") | nindent 4 }}
+spec:
+  replicas: {{ .Values.synthetic.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "wallmart.componentSelectorLabels" (dict "root" . "component" "playwright-loop") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "wallmart.componentSelectorLabels" (dict "root" . "component" "playwright-loop") | nindent 8 }}
+    spec:
+      containers:
+        - name: playwright-loop
+          image: {{ include "wallmart.appImage" (dict "root" . "repository" "playwright-loop") }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          env:
+            - name: PLAYWRIGHT_BASE_URL
+              value: {{ .Values.synthetic.playwright.baseUrl | quote }}
+            - name: PLAYWRIGHT_LOOP_INTERVAL_SECONDS
+              value: {{ .Values.synthetic.playwright.loopIntervalSeconds | quote }}
+            - name: PLAYWRIGHT_WORKERS
+              value: {{ .Values.synthetic.playwright.workers | quote }}
+            - name: PLAYWRIGHT_FULLY_PARALLEL
+              value: {{ .Values.synthetic.playwright.fullyParallel | quote }}
+            - name: PLAYWRIGHT_SYNTHETIC_PACE_MS
+              value: {{ .Values.synthetic.playwright.syntheticPaceMs | quote }}
+            - name: CI
+              value: "1"
+          resources:
+            {{- toYaml .Values.synthetic.resources | nindent 12 }}
+          volumeMounts:
+            - name: dshm
+              mountPath: /dev/shm
+      volumes:
+        - name: dshm
+          emptyDir:
+            medium: Memory
+            sizeLimit: {{ .Values.synthetic.shmSize }}
+{{- end }}
