@@ -2,6 +2,8 @@
 
 Deploy the FreshMart ecommerce demo with the [wallmart-ecommerce](wallmart-ecommerce/) Helm chart.
 
+The base chart deploys the application only — **no AppDynamics agents** and **no Splunk collector**. For Splunk Observability (Java OTel + optional Browser RUM), see [Observability](#observability) below and [`o11y/README.md`](../o11y/README.md). Step-by-step build + deploy: [`docs/deploy-appd-and-o11y.md`](../docs/deploy-appd-and-o11y.md#splunk-o11y-kubernetes).
+
 ## Prerequisites
 
 - Kubernetes 1.25+
@@ -12,6 +14,18 @@ Deploy the FreshMart ecommerce demo with the [wallmart-ecommerce](wallmart-ecomm
 ## Build images
 
 From the repository root:
+
+```bash
+# Splunk o11y: set VITE_OBSERVABILITY_BACKEND=splunk in docker/.env, then:
+./docker/scripts/build-push-scenario.sh splunk
+# or web only (JVM backends are scenario-agnostic):
+./docker/scripts/build-push-scenario.sh splunk --web-only
+
+# Deploy with matching tag:
+REGISTRY_PREFIX=your-registry IMAGE_TAG=splunk ./k8s/install.sh
+```
+
+Generic build (any tag):
 
 ```bash
 REGISTRY_PREFIX=your-registry IMAGE_TAG=latest ./docker/scripts/build-push-all.sh
@@ -35,6 +49,8 @@ kind load docker-image your-registry/ecommerce-web:latest
 # optional synthetic loop:
 kind load docker-image your-registry/playwright-loop:latest
 ```
+
+**Splunk Browser RUM:** if using [`o11y/`](../o11y/), bake RUM into `ecommerce-web` at build time — set `VITE_OBSERVABILITY_BACKEND=splunk` and `VITE_SPLUNK_*` in [`docker/.env`](../docker/.env) before building the web image. See [Observability](#observability).
 
 ## Install
 
@@ -131,6 +147,42 @@ helm upgrade --install wallmart ./k8s/wallmart-ecommerce \
 ```
 
 Never commit real passwords to git.
+
+## Observability
+
+| Layer | Mechanism | Config |
+|-------|-----------|--------|
+| Java backends | Splunk OTel Java agent (operator) | [`o11y/`](../o11y/) after app deploy |
+| Browser RUM | `@splunk/otel-web` in `ecommerce-web` | Build-time `VITE_OBSERVABILITY_BACKEND=splunk` |
+
+**Recommended K8s + Splunk stack:**
+
+```bash
+# 1. Build web image with Splunk RUM (in docker/.env before build):
+#    VITE_OBSERVABILITY_BACKEND=splunk
+#    VITE_SPLUNK_REALM=us1
+#    VITE_SPLUNK_RUM_ACCESS_TOKEN=<rum-token>
+
+REGISTRY_PREFIX=your-registry ./docker/scripts/build-push-all.sh
+
+# 2. Deploy app
+./k8s/install.sh
+
+# 3. Install Splunk OTel Collector + Java injection
+cp o11y/.env.example o11y/.env   # SPLUNK_ACCESS_TOKEN, HEC, realm
+./o11y/install.sh --with-redaction
+./o11y/enable-java-instrumentation.sh
+./o11y/verify.sh --java
+```
+
+Splunk RUM auto-instruments browser `fetch` calls and propagates trace context to OTel-instrumented Java services (end-to-end traces).
+
+| Doc | Purpose |
+|-----|---------|
+| [`o11y/README.md`](../o11y/README.md) | Collector install, Java injection, PII redaction |
+| [`docs/instrument-react-splunk-rum-vite.md`](../docs/instrument-react-splunk-rum-vite.md) | Browser RUM env vars and verification |
+
+The Docker Compose path uses **AppDynamics** instead — see [root README](../README.md#observability).
 
 ## Verify
 

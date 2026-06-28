@@ -2,6 +2,8 @@
 
 This directory is self-contained: copy it to a server, set `.env`, and run **no build** — only images from your registry (or images you have loaded locally).
 
+This path uses the **AppDynamics** observability stack (JVM agent, db-agent, machine-agent). Browser RUM is baked into the `ecommerce-web` image at build time — set `VITE_OBSERVABILITY_BACKEND=appdynamics` when building images (see [`docker/.env.example`](../docker/.env.example)). For **Splunk Observability**, deploy on Kubernetes with [`o11y/`](../o11y/) instead. Step-by-step build + deploy: [`docs/deploy-appd-and-o11y.md`](../docs/deploy-appd-and-o11y.md#appdynamics-docker).
+
 For full project documentation (architecture, local dev, image builds, tests, env reference), see the [root README](../README.md).
 
 ## Quick start
@@ -19,6 +21,24 @@ For full project documentation (architecture, local dev, image builds, tests, en
 4. Open the app at `http://<host>:${WEB_PORT:-8080}`.
 
 5. In the AppDynamics Controller, create an **Microsoft SQL Server** collector on agent **`SQLDBSales`**: host **`sqlserver`**, port **1433**, user **`sa`**, password **`MSSQL_SA_PASSWORD`** from `.env`. See [root README](../README.md#post-deploy-sql-server-collector-database-visibility).
+
+## Browser RUM
+
+Standalone hosts do not rebuild the frontend. RUM is configured when the `ecommerce-web` image was built:
+
+| Setting | Where to set (on build machine) |
+|---------|--------------------------------|
+| `VITE_OBSERVABILITY_BACKEND=appdynamics` | [`docker/.env`](../docker/.env) copied into web Dockerfile |
+| `VITE_APPDYNAMICS_APP_KEY` | same |
+
+Rebuild and push with the AppDynamics scenario tag:
+
+```bash
+./docker/scripts/build-push-scenario.sh appd
+# standalone hosts: IMAGE_TAG=appd in .env
+```
+
+Guides: [AppDynamics RUM](../docs/instrument-react-appdynamics-browser-rum-vite-programmatic.md) · [Splunk RUM](../docs/instrument-react-splunk-rum-vite.md) (K8s path).
 
 ## Helper scripts
 

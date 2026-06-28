@@ -2,9 +2,19 @@
 
 Install the [Splunk Distribution of the OpenTelemetry Collector](https://github.com/signalfx/splunk-otel-collector-chart) to monitor the Kubernetes cluster and auto-instrument the FreshMart Java backends.
 
+**Use with:** Kubernetes app deploy ([`k8s/`](../k8s/)) — not Docker Compose (Docker uses AppDynamics).
+
 **Destinations:**
 - Splunk Observability Cloud — metrics, traces, Kubernetes cluster metrics
 - Splunk Platform HEC — container logs
+
+## Stack overview
+
+| Component | Instrumentation | Config location |
+|-----------|-----------------|-----------------|
+| `product-service`, `cart-service`, `payment-service` | Splunk OTel Java agent (operator) | `o11y/` scripts + annotations |
+| `ecommerce-web` (React) | Splunk Browser RUM (`@splunk/otel-web`) | Build-time `VITE_*` in web image — see [Browser RUM](#browser-rum-ecommerce-web) |
+| Cluster / container logs | Splunk OTel Collector | `o11y/install.sh` |
 
 ## Prerequisites
 
@@ -108,6 +118,45 @@ payment-service stdout → agent logs pipeline → redaction/pii → HEC
 ```
 
 Operator CRDs are cluster-scoped and retained by default.
+
+## Browser RUM (ecommerce-web)
+
+Java auto-instrumentation above does **not** cover the React frontend. Pair Splunk RUM with this stack for browser sessions, Web Vitals, and end-to-end traces (browser `fetch` → OTel Java backends).
+
+### 1. Build web image with Splunk RUM
+
+Set in [`docker/.env`](../docker/.env) before building `ecommerce-web`:
+
+```bash
+VITE_OBSERVABILITY_BACKEND=splunk
+VITE_SPLUNK_REALM=us1                              # same realm as SPLUNK_REALM below
+VITE_SPLUNK_RUM_ACCESS_TOKEN=...                   # RUM token — NOT SPLUNK_ACCESS_TOKEN
+VITE_SPLUNK_APPLICATION_NAME=ecommerce-web
+VITE_SPLUNK_DEPLOYMENT_ENVIRONMENT=dev             # align with DEPLOYMENT_ENV
+```
+
+```bash
+docker compose -f docker/docker-compose.yml build ecommerce-web
+# or push with scenario tag:
+./docker/scripts/build-push-scenario.sh splunk --web-only
+# then: REGISTRY_PREFIX=youruser IMAGE_TAG=splunk ./k8s/install.sh
+```
+
+### 2. Deploy app + o11y (order)
+
+```bash
+./k8s/install.sh
+./o11y/install.sh --with-redaction
+./o11y/enable-java-instrumentation.sh
+```
+
+### 3. Verify
+
+- Splunk Observability Cloud → **RUM** → sessions for `ecommerce-web`
+- DevTools → network to `rum-ingest.{realm}.observability.splunkcloud.com`
+- Traces linking browser to Java services after checkout flows
+
+Full guide: [docs/instrument-react-splunk-rum-vite.md](../docs/instrument-react-splunk-rum-vite.md). AppDynamics Browser RUM (Docker path): [docs/instrument-react-appdynamics-browser-rum-vite-programmatic.md](../docs/instrument-react-appdynamics-browser-rum-vite-programmatic.md).
 
 ## Related docs
 

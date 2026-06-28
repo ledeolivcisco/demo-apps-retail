@@ -28,9 +28,10 @@ function envTruthy(v: string | boolean | undefined): boolean {
   return (v ?? "").trim().toLowerCase() === "true";
 }
 
-export function initAppDynamics(): void {
+export function initAppDynamics(options?: { force?: boolean }): void {
   if (appDynamicsInitStarted) return;
-  const enabled = envTruthy(import.meta.env.VITE_APPDYNAMICS_ENABLED);
+  const enabled =
+    options?.force === true || envTruthy(import.meta.env.VITE_APPDYNAMICS_ENABLED);
   const appKey = import.meta.env.VITE_APPDYNAMICS_APP_KEY?.trim();
 
   if (enabled && !appKey) {

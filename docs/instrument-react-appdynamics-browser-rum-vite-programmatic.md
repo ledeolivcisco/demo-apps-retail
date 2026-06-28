@@ -16,7 +16,7 @@ This guide documents a **Vite + React 18** e-commerce SPA pattern for **Splunk A
 | JavaScript agent | SaaS: `adrum-latest.js` from the AppDynamics CDN (recommended) |
 | SPA2 monitoring | `config.spa = { spa2: true }` — required for React auto-instrumentation |
 | Agent version | JavaScript Agent >= 4.4.3; manual virtual-page naming API >= 4.5 |
-| Vite entry module | `initAppDynamics()` called in `main.tsx` **before** `createRoot()` |
+| Vite entry module | `initObservability()` in `main.tsx` **before** `createRoot()` (dispatches to AppD or Splunk RUM) |
 
 There is **no React-specific npm SDK** for web Browser RUM. This pattern uses manual injection via `window["adrum-config"]` and a dynamically appended `<script>` tag, plus optional calls to the global `ADRUM` API.
 

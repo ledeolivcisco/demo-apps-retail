@@ -1,6 +1,6 @@
 # FreshMart Ecommerce (Wallmart Lab)
 
-A small supermarket demo built with **React 18 + Vite**, **Spring Boot 3.2 / Java 21**, and **Docker Compose**, with optional **AppDynamics APM** and **Browser RUM**. Shopping sessions use two headers — `X-Session-Id` and `X-Session-Username` — propagated from the browser through checkout.
+A small supermarket demo built with **React 18 + Vite**, **Spring Boot 3.2 / Java 21**, and **Docker Compose**, with optional observability: **AppDynamics APM** (Docker path) or **Splunk Observability Cloud** (Kubernetes + [`o11y/`](o11y/)). The React storefront supports **Browser RUM** for either backend via `VITE_OBSERVABILITY_BACKEND`. Shopping sessions use two headers — `X-Session-Id` and `X-Session-Username` — propagated from the browser through checkout.
 
 Deploy on **Kubernetes** with the Helm chart in [`k8s/`](k8s/) — see [Option D](#option-d--kubernetes-helm) and [`k8s/README.md`](k8s/README.md).
 
@@ -36,7 +36,25 @@ In Docker, the React SPA is served by nginx, which also reverse-proxies API call
 | `/pay` | payment-service:8083 |
 | `/` | React SPA (static files) |
 
-### AppDynamics
+### Observability
+
+Two deployment paths — pick one per environment. Do not mix backends on the same stack.
+
+| Path | Where | Java backends | Browser RUM (`ecommerce-web`) |
+|------|-------|---------------|-------------------------------|
+| **AppDynamics** | Docker Compose ([`docker/`](docker/), [`docker-standalone/`](docker-standalone/)) | `appdynamics/java-agent` via `JAVA_TOOL_OPTIONS` | `VITE_OBSERVABILITY_BACKEND=appdynamics` |
+| **Splunk o11y** | Kubernetes + [`o11y/`](o11y/) | Splunk OTel Java agent (operator injection) | `VITE_OBSERVABILITY_BACKEND=splunk` (baked at image build) |
+
+Frontend RUM is configured at **Vite build time** (`VITE_*` env vars). Rebuild the web image after changing RUM settings.
+
+| Guide | Backend |
+|-------|---------|
+| [`docs/deploy-appd-and-o11y.md`](docs/deploy-appd-and-o11y.md) | Short runbook: build images + start with AppD or Splunk o11y |
+| [`docs/instrument-react-appdynamics-browser-rum-vite-programmatic.md`](docs/instrument-react-appdynamics-browser-rum-vite-programmatic.md) | AppDynamics Browser RUM |
+| [`docs/instrument-react-splunk-rum-vite.md`](docs/instrument-react-splunk-rum-vite.md) | Splunk Browser RUM |
+| [`o11y/README.md`](o11y/README.md) | Splunk OTel Collector + Java auto-instrumentation (K8s) |
+
+### AppDynamics (Docker path)
 
 All JVM services mount a shared volume seeded by the `splunk-java-agent` sidecar (`appdynamics/java-agent:26.4.0`). Each service sets `JAVA_TOOL_OPTIONS` with the Java agent and controller credentials from `docker/.env`.
 
@@ -108,7 +126,15 @@ APPDYNAMICS_AGENT_ACCOUNT_NAME=your-account
 APPDYNAMICS_AGENT_ACCOUNT_ACCESS_KEY=your-access-key
 ```
 
-See [`docker/.env.example`](docker/.env.example) for the full variable list (ports, image naming, Browser RUM, synthetic loop). For Browser RUM in the production web build, set `VITE_APPDYNAMICS_*` keys in the same file — the web Dockerfile copies `docker/.env` as `.env.production` at build time.
+Optional Browser RUM (rebuild web image after changing):
+
+```bash
+VITE_OBSERVABILITY_BACKEND=appdynamics
+VITE_APPDYNAMICS_ENABLED=true
+VITE_APPDYNAMICS_APP_KEY=your-eum-browser-key
+```
+
+See [`docker/.env.example`](docker/.env.example) for the full variable list (ports, image naming, Browser RUM, synthetic loop). For Browser RUM in the production web build, set `VITE_OBSERVABILITY_BACKEND` (`appdynamics` or `splunk`) and the matching `VITE_APPDYNAMICS_*` or `VITE_SPLUNK_*` keys — the web Dockerfile copies `docker/.env` as `.env.production` at build time.
 
 ### 2. Build and start
 
@@ -231,8 +257,11 @@ Open [http://localhost:5173](http://localhost:5173). Vite proxies API paths to t
 
 ```bash
 cp ecommerce-web/.env.example ecommerce-web/.env.local
-# Edit VITE_APPDYNAMICS_ENABLED=true and VITE_APPDYNAMICS_APP_KEY=...
+# AppDynamics: VITE_OBSERVABILITY_BACKEND=appdynamics + VITE_APPDYNAMICS_APP_KEY=...
+# Splunk o11y: VITE_OBSERVABILITY_BACKEND=splunk + VITE_SPLUNK_REALM + VITE_SPLUNK_RUM_ACCESS_TOKEN
 ```
+
+See [`docs/instrument-react-splunk-rum-vite.md`](docs/instrument-react-splunk-rum-vite.md) for Splunk RUM setup. For AppDynamics, see [`docs/instrument-react-appdynamics-browser-rum-vite-programmatic.md`](docs/instrument-react-appdynamics-browser-rum-vite-programmatic.md).
 
 Restart `npm run dev` after changing env files.
 
@@ -256,7 +285,7 @@ Open `http://<host>:8080` (or `${WEB_PORT}`).
 - No `build:` sections — images must exist as `{REGISTRY_PREFIX}/{service}:{IMAGE_TAG}`
 - Supports `COMPOSE_PULL_POLICY` (default `missing`; set `never` for air-gapped hosts)
 
-Both stacks are otherwise aligned (Java APM, db-agent **`SQLDBSales`**, machine-agent, SQL Server).
+Both stacks are otherwise aligned (Java APM, db-agent **`SQLDBSales`**, machine-agent, SQL Server). Browser RUM is baked into the `ecommerce-web` image at build time — set `VITE_OBSERVABILITY_BACKEND` and matching vars in [`docker/.env`](docker/.env) before `build-push-all.sh` (standalone hosts pull the pre-built image).
 
 **Air-gapped / offline:**
 
@@ -281,7 +310,7 @@ See [`docker-standalone/README.md`](docker-standalone/README.md) for a short sta
 
 ## Option D — Kubernetes (Helm)
 
-Deploy the core stack (SQL Server + three JVM services + nginx web) on generic Kubernetes with the [`k8s/wallmart-ecommerce/`](k8s/wallmart-ecommerce/) Helm chart. **No AppDynamics agents** in this path — application logging only (Phase 1).
+Deploy the core stack (SQL Server + three JVM services + nginx web) on generic Kubernetes with the [`k8s/wallmart-ecommerce/`](k8s/wallmart-ecommerce/) Helm chart. **No AppDynamics agents** in the base chart — application logging only (Phase 1). For full Splunk Observability, add [`o11y/`](o11y/) after deploy.
 
 **Prerequisites:** Kubernetes 1.25+, Helm 3, images built/pushed (see [Building Docker images manually](#building-docker-images-manually)).
 
@@ -326,6 +355,33 @@ Open [http://localhost:8080](http://localhost:8080).
 
 Full install, secrets, lint/dry-run, and uninstall: [`k8s/README.md`](k8s/README.md). Plan/checklist: [`docs/kubernetes-phase2-plan.md`](docs/kubernetes-phase2-plan.md).
 
+### Splunk Observability (K8s + o11y/)
+
+After the app is running, install the Splunk OTel Collector and enable Java auto-instrumentation:
+
+```bash
+cp o11y/.env.example o11y/.env
+# Edit SPLUNK_REALM, SPLUNK_ACCESS_TOKEN, HEC vars
+
+./o11y/install.sh --with-redaction
+./o11y/enable-java-instrumentation.sh
+./o11y/verify.sh --java
+```
+
+**Browser RUM:** build `ecommerce-web` with Splunk vars before pushing/deploying:
+
+```bash
+# In docker/.env (or build env):
+VITE_OBSERVABILITY_BACKEND=splunk
+VITE_SPLUNK_REALM=us1
+VITE_SPLUNK_RUM_ACCESS_TOKEN=...   # RUM token — not SPLUNK_ACCESS_TOKEN
+
+docker compose -f docker/docker-compose.yml build ecommerce-web
+# then push / load image and rollout restart ecommerce-web
+```
+
+See [`o11y/README.md`](o11y/README.md) and [`docs/instrument-react-splunk-rum-vite.md`](docs/instrument-react-splunk-rum-vite.md).
+
 ---
 
 ## Building Docker images manually
@@ -340,6 +396,12 @@ From the repository root:
 REGISTRY_PREFIX=youruser IMAGE_TAG=latest ./docker/scripts/build-push-all.sh
 ./docker/scripts/push-all.sh
 
+# Scenario tags — separate AppDynamics vs Splunk o11y on Docker Hub
+# Set VITE_OBSERVABILITY_BACKEND in docker/.env first, then:
+./docker/scripts/build-push-scenario.sh appd              # tags: :appd
+./docker/scripts/build-push-scenario.sh splunk            # tags: :splunk
+./docker/scripts/build-push-scenario.sh splunk --web-only # only ecommerce-web (backends shared)
+
 # Remove local app images before a clean rebuild
 ./docker/scripts/delete-all-images.sh
 ```
@@ -348,8 +410,19 @@ REGISTRY_PREFIX=youruser IMAGE_TAG=latest ./docker/scripts/build-push-all.sh
 |--------|---------|
 | [`build-all.sh`](docker/scripts/build-all.sh) | Multi-arch build, load into local Docker |
 | [`build-push-all.sh`](docker/scripts/build-push-all.sh) | Build and push all images |
+| [`build-push-scenario.sh`](docker/scripts/build-push-scenario.sh) | Build and push with `IMAGE_TAG=appd` or `splunk` (validates `docker/.env`) |
+| [`build-web-only.sh`](docker/scripts/build-web-only.sh) | Build/push `ecommerce-web` only (after RUM env changes) |
 | [`push-all.sh`](docker/scripts/push-all.sh) | Push locally tagged images |
 | [`delete-all-images.sh`](docker/scripts/delete-all-images.sh) | Remove local `{REGISTRY_PREFIX}/*` app images |
+
+**Scenario image tags** (Browser RUM is baked into `ecommerce-web`; JVM backends are the same for both):
+
+| Tag | Deploy path | `docker/.env` |
+|-----|-------------|---------------|
+| `appd` | Docker Compose / [`docker-standalone/`](docker-standalone/) | `VITE_OBSERVABILITY_BACKEND=appdynamics` |
+| `splunk` | Kubernetes + [`o11y/`](o11y/) | `VITE_OBSERVABILITY_BACKEND=splunk` |
+
+Set `IMAGE_TAG=appd` or `IMAGE_TAG=splunk` in compose / `k8s/install.sh` to pull the matching images.
 
 **Build script env overrides:**
 
@@ -368,7 +441,7 @@ REGISTRY_PREFIX=youruser IMAGE_TAG=latest ./docker/scripts/build-push-all.sh
 - `{REGISTRY_PREFIX}/ecommerce-web:{IMAGE_TAG}`
 - `{REGISTRY_PREFIX}/playwright-loop:{IMAGE_TAG}` (synthetic profile)
 
-**Dockerfile pattern:** backends use multi-stage builds (Maven 3.9 + Eclipse Temurin 21 JRE); the web image uses Node 20 to build the SPA, then serves it with nginx 1.27.
+**Dockerfile pattern:** backends use multi-stage builds (Maven 3.9 + Eclipse Temurin 21 JRE); the web image uses Node 20 to build the SPA, then serves it with nginx 1.27. The web build copies [`docker/.env`](docker/.env) as `.env.production` — set `VITE_OBSERVABILITY_BACKEND` and RUM credentials there before building `ecommerce-web`.
 
 **Build a single service via compose:**
 
@@ -410,9 +483,15 @@ Canonical templates: [`docker/.env.example`](docker/.env.example) (Docker compos
 | `PLAYWRIGHT_WORKERS` | No | `4` | playwright-loop (parallel browsers) |
 | `PLAYWRIGHT_FULLY_PARALLEL` | No | `true` | playwright-loop |
 | `PLAYWRIGHT_SYNTHETIC_PACE_MS` | No | `500` | playwright-loop (shorter sleeps) |
-| `VITE_APPDYNAMICS_ENABLED` | No | `false` | Browser RUM (web build) |
-| `VITE_APPDYNAMICS_APP_KEY` | No | — | Browser RUM (web build) |
-| `VITE_APPDYNAMICS_*` (beacon, CDN URLs) | No | SaaS defaults | Browser RUM (web build) |
+| `VITE_OBSERVABILITY_BACKEND` | No | legacy / `appdynamics` in docker example | Browser RUM backend: `appdynamics` \| `splunk` \| `none` |
+| `VITE_APPDYNAMICS_ENABLED` | No | `false` | Legacy AppD toggle (use `VITE_OBSERVABILITY_BACKEND` instead) |
+| `VITE_APPDYNAMICS_APP_KEY` | No | — | AppDynamics Browser RUM (web build) |
+| `VITE_APPDYNAMICS_*` (beacon, CDN URLs) | No | SaaS defaults | AppDynamics Browser RUM (web build) |
+| `VITE_SPLUNK_REALM` | No | — | Splunk Browser RUM realm (web build) |
+| `VITE_SPLUNK_RUM_ACCESS_TOKEN` | No | — | Splunk RUM token (web build; not `SPLUNK_ACCESS_TOKEN`) |
+| `VITE_SPLUNK_APPLICATION_NAME` | No | `ecommerce-web` | Splunk RUM app name |
+| `VITE_SPLUNK_DEPLOYMENT_ENVIRONMENT` | No | `dev` | Splunk RUM environment tag |
+| `VITE_SPLUNK_SPA_METRICS` | No | enabled | Splunk SPA route metrics; set `false` to disable |
 
 **Standalone-only** (see [`docker-standalone/.env.example`](docker-standalone/.env.example)):
 
@@ -602,9 +681,11 @@ WALLMART/
 │   └── scripts/               # build-all.sh, build-push-all.sh, push-all.sh
 ├── docker-standalone/         # Pull-only compose for servers
 ├── k8s/                       # Helm chart (Kubernetes deployment)
-│   ├── README.md              # Install, LoadBalancer, local port-forward
+│   ├── README.md              # Install, LoadBalancer, local port-forward, o11y
 │   └── wallmart-ecommerce/    # Chart (values.yaml, templates)
-├── docs/                      # Phase plans (logging, kubernetes)
+├── o11y/                      # Splunk OTel Collector (K8s observability)
+│   └── README.md              # Install, Java injection, Browser RUM pairing
+├── docs/                      # Phase plans, RUM instrumentation guides
 ├── run/                       # Separate legacy demo (stonks game) — not part of ecommerce
 ├── up.sh / down.sh / ps.sh / logs.sh / up_load.sh / logs_loop.sh / logs_db_agent.sh / logs_machine_agent.sh
 └── README.md
@@ -622,6 +703,8 @@ WALLMART/
 | JVM services fail to start in Docker | Check `APPDYNAMICS_*` values in `docker/.env` — copy from [`docker/.env.example`](docker/.env.example) if missing |
 | E2E tests fail | Stack must be up at `PLAYWRIGHT_BASE_URL` (default `http://localhost:8080`) |
 | Port already in use | Change `WEB_PORT` / `PRODUCT_PORT` / etc. in `docker/.env` |
+| Browser RUM not appearing | Rebuild web image after changing `VITE_*` vars; confirm `VITE_OBSERVABILITY_BACKEND` matches your stack (`appdynamics` for Docker, `splunk` for K8s+o11y) |
+| Splunk RUM on K8s but no sessions | Use a **RUM access token** (`VITE_SPLUNK_RUM_ACCESS_TOKEN`), not the org ingest token from `o11y/.env` |
 | `docker buildx is required` | Install Docker Buildx, or use `docker compose build` for single-platform local builds |
 
 ---
