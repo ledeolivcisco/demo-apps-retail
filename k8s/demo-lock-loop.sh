@@ -40,14 +40,30 @@ if command -v oc >/dev/null 2>&1 && oc whoami >/dev/null 2>&1; then
   kubectl_bin="oc"
 fi
 
+read_env_var() {
+  local file="$1" key="$2"
+  local line val
+  [[ -f "${file}" ]] || return 1
+  line="$(grep -E "^${key}=" "${file}" 2>/dev/null | tail -1)" || return 1
+  val="${line#*=}"
+  val="${val%\"}"
+  val="${val#\"}"
+  val="${val%\'}"
+  val="${val#\'}"
+  [[ -n "${val}" ]] || return 1
+  printf '%s' "${val}"
+}
+
 load_env_files() {
   for candidate in "${ROOT}/docker/.env" "${ROOT}/docker-standalone/.env"; do
     if [[ -f "${candidate}" ]]; then
-      # shellcheck disable=SC1090
-      set -a
-      source "${candidate}"
-      set +a
-      NAMESPACE="${K8S_NAMESPACE:-${HELM_NAMESPACE:-${NAMESPACE}}}"
+      local ns
+      ns="$(read_env_var "${candidate}" K8S_NAMESPACE)" \
+        || ns="$(read_env_var "${candidate}" HELM_NAMESPACE)" \
+        || true
+      if [[ -n "${ns}" ]]; then
+        NAMESPACE="${ns}"
+      fi
       return 0
     fi
   done
