@@ -42,6 +42,12 @@ agent:
           # MasterCard: 51–55xx xxxx xxxx xxxx
           - '\b5[1-5][0-9]{2}[\s-]?[0-9]{4}[\s-]?[0-9]{4}[\s-]?[0-9]{4}\b'
 
+          # Amex: 15 digits, starts with 34 or 37 (demo BIN 3782)
+          - '\b3[47][0-9]{13}\b'
+
+          # Amex with optional separators (4-6-5 grouping)
+          - '\b3[47][0-9]{2}[\s-]?[0-9]{6}[\s-]?[0-9]{5}\b'
+
           # US SSN: XXX-XX-XXXX (matches payment-service demo 900-XX-XXXX)
           - '\b[0-9]{3}-[0-9]{2}-[0-9]{4}\b'
 

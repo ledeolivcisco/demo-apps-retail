@@ -90,7 +90,7 @@ Based on the [Splunk Observability sensitive-data workshop](https://splunk.githu
 
 The `payment-service` logs simulated fake credit card numbers and SSNs on checkout (`event=payment.confirmed`). The `redaction/pii` processor masks:
 
-- Visa and MasterCard patterns
+- Visa, MasterCard, and American Express patterns (Amex: 34/37 prefix, 15 digits)
 - US SSN pattern (`XXX-XX-XXXX`, matches demo `900-XX-XXXX` values)
 
 Enable at install or upgrade an existing release:

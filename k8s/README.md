@@ -198,6 +198,30 @@ kubectl get pods -n wallmart
 kubectl logs -n wallmart deploy/product-service -f
 ```
 
+## Demo / chaos
+
+Inventory lock loop (same HTTP scenario as [`docker-standalone/demo-lock-loop.sh`](../docker-standalone/demo-lock-loop.sh)) runs **in-cluster** via a curl Deployment — no port-forward.
+
+**Prerequisite:** enable chaos on product-service:
+
+```bash
+helm upgrade --install wallmart ./k8s/wallmart-ecommerce \
+  --namespace wallmart --reuse-values \
+  --set appConfig.demoChaosEnabled=true
+kubectl rollout restart deployment/product-service -n wallmart
+```
+
+**Control** (uses `kubectl` or `oc` when logged in):
+
+```bash
+./k8s/demo-lock-loop.sh start    # deploy loop pod
+./k8s/demo-lock-loop.sh status   # deployment / pod state
+./k8s/demo-lock-loop.sh logs     # follow curl output (HTTP 202 = lock started)
+./k8s/demo-lock-loop.sh stop     # remove deployment
+```
+
+Optional env: `HELM_NAMESPACE`, `DEMO_LOCK_SECONDS` (default 60), `DEMO_LOCK_INTERVAL_SECONDS` (default 60), `DEMO_LOCK_URL`.
+
 ## Uninstall
 
 ```bash

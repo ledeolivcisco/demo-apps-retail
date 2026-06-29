@@ -76,7 +76,7 @@ Helm sets `splunkPlatform.endpoint` and `splunkPlatform.index` from `o11y/.env`.
    ```bash
    oc logs -n wallmart deploy/payment-service | grep creditCardNumber
    ```
-3. In Splunk, search `payment.confirmed` — values should be masked when installed with `--with-redaction`.
+3. In Splunk, search `payment.confirmed` — `creditCardNumber`, `creditCardBrand=amex`, and `ssn` values should be masked when installed with `--with-redaction` (Visa, MasterCard, Amex, SSN).
 
 ## OpenShift vs generic K8s
 

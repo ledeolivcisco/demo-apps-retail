@@ -31,3 +31,6 @@ synthetic:
   enabled: true
   playwright:
     baseUrl: http://ecommerce-web:8080
+
+# appConfig:
+#   demoChaosEnabled: true   # required for k8s/demo-lock-loop.sh
