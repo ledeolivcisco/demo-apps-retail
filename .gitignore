@@ -11,6 +11,9 @@ docker/compose.env
 docker-standalone/.env
 docker-standalone/.envWALM
 docker-standalone/.envSELAB
+docker-standalone-o11y/.env
+docker-standalone-o11y/.envWALM
+docker-standalone-o11y/.envSELAB
 run/.env
 ecommerce-web/.env
 k8s/wallmart-ecommerce/values-local.yaml
