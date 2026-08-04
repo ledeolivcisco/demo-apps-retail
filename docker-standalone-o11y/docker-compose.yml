@@ -104,6 +104,8 @@ services:
     depends_on:
       product-service:
         condition: service_healthy
+      appliance-service:
+        condition: service_healthy
       splunk-java-agent:
         condition: service_started
       splunk-otel-collector:
@@ -121,6 +123,7 @@ services:
       SPLUNK_OPAMP_ENDPOINT: http://splunk-otel-collector:4320/v1/opamp
       WALLMART_PRODUCT_SERVICE_BASE_URL: http://product-service:8081
       WALLMART_PAYMENT_SERVICE_BASE_URL: http://payment-service:8083
+      WALLMART_APPLIANCE_SERVICE_BASE_URL: http://appliance-service:8084
       WALLMART_DB_HOST: sqlserver
       WALLMART_DB_PORT: "1433"
       WALLMART_DB_NAME: wallmart
@@ -208,6 +211,7 @@ services:
       - product-service
       - cart-service
       - payment-service
+      - appliance-service
 
   playwright-loop:
     profiles:

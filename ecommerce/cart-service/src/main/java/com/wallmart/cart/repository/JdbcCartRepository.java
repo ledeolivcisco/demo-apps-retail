@@ -16,20 +16,26 @@ public class JdbcCartRepository {
   private static final String MERGE_LINE =
       """
       MERGE cart_line AS target
-      USING (SELECT ? AS session_id, ? AS product_id, ? AS quantity) AS source
-      ON target.session_id = source.session_id AND target.product_id = source.product_id
+      USING (SELECT ? AS session_id, ? AS item_type, ? AS item_id, ? AS quantity) AS source
+      ON target.session_id = source.session_id
+        AND target.item_type = source.item_type
+        AND target.item_id = source.item_id
       WHEN MATCHED THEN UPDATE SET quantity = target.quantity + source.quantity
-      WHEN NOT MATCHED THEN INSERT (session_id, product_id, quantity)
-        VALUES (source.session_id, source.product_id, source.quantity);
+      WHEN NOT MATCHED THEN INSERT (session_id, item_type, item_id, quantity)
+        VALUES (source.session_id, source.item_type, source.item_id, source.quantity);
       """;
 
   private static final String SELECT_CART =
       """
-      SELECT c.product_id, p.product_description, p.product_price, p.product_picture, c.quantity
+      SELECT c.item_type, c.item_id, c.quantity,
+             COALESCE(p.product_description, a.appliance_description) AS description,
+             COALESCE(p.product_price, a.appliance_price) AS price,
+             COALESCE(p.product_picture, a.appliance_picture) AS picture
       FROM cart_line c
-      JOIN products p ON p.product_id = c.product_id
+      LEFT JOIN products p ON c.item_type = 'PRODUCT' AND p.product_id = c.item_id
+      LEFT JOIN appliances a ON c.item_type = 'APPLIANCE' AND a.appliance_id = c.item_id
       WHERE c.session_id = ?
-      ORDER BY c.product_id
+      ORDER BY c.item_type, c.item_id
       """;
 
   private final JdbcTemplate jdbc;
@@ -38,8 +44,8 @@ public class JdbcCartRepository {
     this.jdbc = jdbc;
   }
 
-  public void addProduct(String sessionId, String productId) {
-    jdbc.update(MERGE_LINE, sessionId, productId, 1);
+  public void addItem(String sessionId, String itemType, String itemId) {
+    jdbc.update(MERGE_LINE, sessionId, itemType, itemId, 1);
   }
 
   public CartResponse getCart(String sessionId) {
@@ -48,18 +54,17 @@ public class JdbcCartRepository {
             SELECT_CART,
             (rs, rowNum) ->
                 new CartLineItem(
-                    rs.getString("product_id"),
-                    rs.getString("product_description"),
-                    rs.getBigDecimal("product_price"),
-                    rs.getString("product_picture"),
+                    rs.getString("item_type"),
+                    rs.getString("item_id"),
+                    rs.getString("description"),
+                    rs.getBigDecimal("price"),
+                    rs.getString("picture"),
                     rs.getInt("quantity")),
             sessionId);
 
     BigDecimal total = BigDecimal.ZERO;
     for (CartLineItem item : items) {
-      total =
-          total.add(
-              item.productPrice().multiply(BigDecimal.valueOf(item.quantity())));
+      total = total.add(item.price().multiply(BigDecimal.valueOf(item.quantity())));
     }
     total = total.setScale(MONEY_SCALE, RoundingMode.HALF_UP);
     return new CartResponse(items, total);

@@ -34,10 +34,10 @@ CREATE TABLE appliance_inventory (
 
 CREATE TABLE cart_line (
   session_id VARCHAR(36) NOT NULL,
-  product_id VARCHAR(10) NOT NULL,
+  item_type  VARCHAR(10) NOT NULL CHECK (item_type IN ('PRODUCT','APPLIANCE')),
+  item_id    VARCHAR(10) NOT NULL,
   quantity   INT NOT NULL CHECK (quantity > 0),
-  PRIMARY KEY (session_id, product_id),
-  FOREIGN KEY (product_id) REFERENCES products(product_id)
+  PRIMARY KEY (session_id, item_type, item_id)
 );
 
 CREATE TABLE payment_transaction (

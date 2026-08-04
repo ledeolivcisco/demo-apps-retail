@@ -28,6 +28,10 @@ export default defineConfig({
         target: "http://127.0.0.1:8082",
         changeOrigin: true,
       },
+      "/addappliance": {
+        target: "http://127.0.0.1:8082",
+        changeOrigin: true,
+      },
       "/clearcart": {
         target: "http://127.0.0.1:8082",
         changeOrigin: true,
@@ -38,6 +42,10 @@ export default defineConfig({
       },
       "/pay": {
         target: "http://127.0.0.1:8083",
+        changeOrigin: true,
+      },
+      "/graphql": {
+        target: "http://127.0.0.1:8084",
         changeOrigin: true,
       },
     },

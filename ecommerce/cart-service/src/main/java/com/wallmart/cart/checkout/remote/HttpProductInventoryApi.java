@@ -27,7 +27,7 @@ public final class HttpProductInventoryApi implements ProductInventoryApi {
     log.info("event=checkout.inventory.deduct.requested lineCount={}", lines.size());
     List<InventoryLinePayload> body =
         lines.stream()
-            .map(l -> new InventoryLinePayload(l.productId(), l.quantity()))
+            .map(l -> new InventoryLinePayload(l.itemId(), l.quantity()))
             .toList();
     try {
       client
@@ -54,7 +54,7 @@ public final class HttpProductInventoryApi implements ProductInventoryApi {
   public void restore(List<CartLineItem> lines) {
     List<InventoryLinePayload> body =
         lines.stream()
-            .map(l -> new InventoryLinePayload(l.productId(), l.quantity()))
+            .map(l -> new InventoryLinePayload(l.itemId(), l.quantity()))
             .toList();
     try {
       client

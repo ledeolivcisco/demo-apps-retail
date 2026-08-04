@@ -40,6 +40,16 @@ public class CartController {
     return ResponseEntity.ok(Map.of("message", "Product added to cart"));
   }
 
+  @RequestMapping(value = "/addappliance/{id}", method = {RequestMethod.GET, RequestMethod.POST})
+  public ResponseEntity<?> addAppliance(@PathVariable("id") String id) {
+    Optional<String> error = cartService.addAppliance(id);
+    if (error.isPresent()) {
+      return ResponseEntity.status(HttpStatus.NOT_FOUND)
+          .body(Map.of("message", error.get()));
+    }
+    return ResponseEntity.ok(Map.of("message", "Appliance added to cart"));
+  }
+
   @GetMapping("/getcart")
   public ResponseEntity<CartResponse> getCart() {
     return ResponseEntity.ok(cartService.getCart());

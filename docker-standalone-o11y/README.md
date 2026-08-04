@@ -23,11 +23,11 @@ For full project documentation (architecture, local dev, image builds, tests, en
    docker compose up -d
    ```
 
-4. Open the app at `http://<host>:${WEB_PORT:-8080}`.
+4. Open the app at `http://<host>:${WEB_PORT:-8080}` — includes the **Appliances** shopping section (nginx proxies `/graphql` and `/addappliance` to `appliance-service`).
 
 5. Verify collector from the host (distroless image has no in-container health probe): `curl -s http://localhost:13133/`
 
-6. **Appliances GraphQL** (optional): GraphiQL at `http://<host>:${APPLIANCE_PORT:-8084}/graphiql?path=/graphql` — not routed through nginx.
+6. **Appliances GraphiQL** (optional, direct to the service): `http://<host>:${APPLIANCE_PORT:-8084}/graphiql?path=/graphql`.
 
 7. Generate traffic and confirm traces in Splunk APM for `product-service`, `cart-service`, `payment-service`, and `appliance-service`.
 

@@ -15,6 +15,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.wallmart.db.testsupport.AbstractSqlServerSpringBootTest;
+import com.wallmart.cart.checkout.ApplianceInventoryApi;
 import com.wallmart.cart.checkout.CheckoutInventoryConflictException;
 import com.wallmart.cart.checkout.CheckoutPaymentException;
 import com.wallmart.cart.checkout.PayResult;
@@ -41,6 +42,8 @@ class CheckoutControllerApiTest extends AbstractSqlServerSpringBootTest {
   @Autowired private MockMvc mockMvc;
 
   @MockBean private ProductInventoryApi productInventoryApi;
+
+  @MockBean private ApplianceInventoryApi applianceInventoryApi;
 
   @MockBean private PaymentConfirmationApi paymentConfirmationApi;
 
@@ -143,5 +146,97 @@ class CheckoutControllerApiTest extends AbstractSqlServerSpringBootTest {
 
     verify(productInventoryApi).deduct(anyList());
     verify(productInventoryApi).restore(anyList());
+  }
+
+  @Test
+  @DisplayName("POST /checkout with an appliance-only cart deducts appliance stock via GraphQL client")
+  void checkout_applianceOnlyCart_deductsApplianceStock() throws Exception {
+    mockMvc.perform(withSession(post("/addappliance/A6"))).andExpect(status().isOk());
+
+    doNothing().when(applianceInventoryApi).deduct(anyList());
+    when(paymentConfirmationApi.confirm(any(BigDecimal.class)))
+        .thenReturn(new PayResult("success", "Payment successful"));
+
+    mockMvc
+        .perform(
+            withSession(post("/checkout"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"value\":149.99}")
+                .accept(MediaType.APPLICATION_JSON))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("success"));
+
+    verify(applianceInventoryApi).deduct(anyList());
+    verify(productInventoryApi, never()).deduct(anyList());
+  }
+
+  @Test
+  @DisplayName("POST /checkout with a mixed cart deducts both product and appliance stock")
+  void checkout_mixedCart_deductsBothInventories() throws Exception {
+    mockMvc.perform(withSession(post("/addproduct/1"))).andExpect(status().isOk());
+    mockMvc.perform(withSession(post("/addappliance/A6"))).andExpect(status().isOk());
+
+    doNothing().when(productInventoryApi).deduct(anyList());
+    doNothing().when(applianceInventoryApi).deduct(anyList());
+    when(paymentConfirmationApi.confirm(any(BigDecimal.class)))
+        .thenReturn(new PayResult("success", "Payment successful"));
+
+    mockMvc
+        .perform(
+            withSession(post("/checkout"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"value\":153.48}")
+                .accept(MediaType.APPLICATION_JSON))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("success"));
+
+    verify(productInventoryApi).deduct(anyList());
+    verify(applianceInventoryApi).deduct(anyList());
+  }
+
+  @Test
+  @DisplayName("POST /checkout returns 409 when appliance stock deduct fails")
+  void checkout_applianceInventoryConflict_returns409() throws Exception {
+    mockMvc.perform(withSession(post("/addappliance/A6"))).andExpect(status().isOk());
+
+    doThrow(new CheckoutInventoryConflictException("Insufficient stock for appliance A6"))
+        .when(applianceInventoryApi)
+        .deduct(anyList());
+
+    mockMvc
+        .perform(
+            withSession(post("/checkout"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"value\":149.99}")
+                .accept(MediaType.APPLICATION_JSON))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.message").value("Insufficient stock for appliance A6"));
+
+    verify(paymentConfirmationApi, never()).confirm(any());
+  }
+
+  @Test
+  @DisplayName(
+      "POST /checkout with a mixed cart only restores products when appliance deduct fails")
+  void checkout_mixedCart_applianceDeductFails_onlyRestoresProducts() throws Exception {
+    mockMvc.perform(withSession(post("/addproduct/1"))).andExpect(status().isOk());
+    mockMvc.perform(withSession(post("/addappliance/A6"))).andExpect(status().isOk());
+
+    doNothing().when(productInventoryApi).deduct(anyList());
+    doNothing().when(productInventoryApi).restore(anyList());
+    doThrow(new CheckoutInventoryConflictException("Insufficient stock for appliance A6"))
+        .when(applianceInventoryApi)
+        .deduct(anyList());
+
+    mockMvc
+        .perform(
+            withSession(post("/checkout"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"value\":153.48}")
+                .accept(MediaType.APPLICATION_JSON))
+        .andExpect(status().isConflict());
+
+    verify(productInventoryApi).restore(anyList());
+    verify(applianceInventoryApi, never()).restore(anyList());
   }
 }

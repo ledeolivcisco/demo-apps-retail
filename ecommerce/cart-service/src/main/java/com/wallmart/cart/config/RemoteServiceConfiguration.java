@@ -1,7 +1,9 @@
 package com.wallmart.cart.config;
 
+import com.wallmart.cart.checkout.ApplianceInventoryApi;
 import com.wallmart.cart.checkout.PaymentConfirmationApi;
 import com.wallmart.cart.checkout.ProductInventoryApi;
+import com.wallmart.cart.checkout.remote.GraphQlApplianceInventoryApi;
 import com.wallmart.cart.checkout.remote.HttpPaymentConfirmationApi;
 import com.wallmart.cart.checkout.remote.HttpProductInventoryApi;
 import com.wallmart.session.SessionPropagationInterceptor;
@@ -37,8 +39,24 @@ public class RemoteServiceConfiguration {
   }
 
   @Bean
+  @Qualifier("appliance")
+  RestClient applianceRestClient(
+      @Value("${wallmart.appliance-service-base-url:http://127.0.0.1:8084}") String baseUrl,
+      SessionPropagationInterceptor sessionPropagationInterceptor) {
+    return RestClient.builder()
+        .baseUrl(baseUrl)
+        .requestInterceptor(sessionPropagationInterceptor)
+        .build();
+  }
+
+  @Bean
   ProductInventoryApi productInventoryApi(@Qualifier("product") RestClient client) {
     return new HttpProductInventoryApi(client);
+  }
+
+  @Bean
+  ApplianceInventoryApi applianceInventoryApi(@Qualifier("appliance") RestClient client) {
+    return new GraphQlApplianceInventoryApi(client);
   }
 
   @Bean

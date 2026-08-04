@@ -18,9 +18,9 @@ For full project documentation (architecture, local dev, image builds, tests, en
    docker compose up -d
    ```
 
-4. Open the app at `http://<host>:${WEB_PORT:-8080}`.
+4. Open the app at `http://<host>:${WEB_PORT:-8080}` — includes the **Appliances** shopping section (nginx proxies `/graphql` and `/addappliance` to `appliance-service`).
 
-5. **Appliances GraphQL** (optional): GraphiQL at `http://<host>:${APPLIANCE_PORT:-8084}/graphiql?path=/graphql` — not routed through nginx.
+5. **Appliances GraphiQL** (optional, direct to the service): `http://<host>:${APPLIANCE_PORT:-8084}/graphiql?path=/graphql`.
 
 6. In the AppDynamics Controller, create an **Microsoft SQL Server** collector on agent **`SQLDBSales`**: host **`sqlserver`**, port **1433**, user **`sa`**, password **`MSSQL_SA_PASSWORD`** from `.env`. See [root README](../README.md#post-deploy-sql-server-collector-database-visibility).
 

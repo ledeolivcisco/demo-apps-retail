@@ -12,20 +12,21 @@ Deploy on **Kubernetes** with the Helm chart in [`k8s/`](k8s/) — see [Option D
 | **product-service** | 8081 | Grocery product catalog + inventory (REST) |
 | **cart-service** | 8082 | Cart + checkout orchestration |
 | **payment-service** | 8083 | Mock payment confirmation |
-| **appliance-service** | 8084 | Appliances catalog + inventory ([GraphQL](http://localhost:8084/graphiql?path=/graphql); not proxied by nginx yet) |
+| **appliance-service** | 8084 | Appliances catalog + inventory ([GraphQL](http://localhost:8084/graphiql?path=/graphql), proxied by nginx at `/graphql`) |
 
 **Checkout flow:** browser → `POST /checkout` (cart) → `POST /internal/inventory/deduct` (product) → `POST /confirm-payment` (payment).
 
-**Appliances (GraphQL):** direct to `appliance-service:8084` — queries `appliances` / `appliance`, mutations `deductApplianceStock` / `restoreApplianceStock`. Uses dedicated `appliances` + `appliance_inventory` tables (fridges, ovens, washing machines). No session headers required.
+**Appliances (GraphQL):** browser queries `appliances` / `appliance` via nginx `/graphql` → `appliance-service`. Adding an appliance to the cart goes through `cart-service` (`POST /addappliance/{id}`), which drives `deductApplianceStock` / `restoreApplianceStock` mutations on checkout/rollback. Uses dedicated `appliances` + `appliance_inventory` tables (fridges, ovens, washing machines). The cart is unified — grocery products and appliances share the same cart/checkout/payment flow.
 
 ```mermaid
 flowchart LR
   Browser --> Web[ecommerce-web nginx]
   Web -->|"/productsearch"| Product[product-service :8081]
-  Web -->|"/getcart /checkout"| Cart[cart-service :8082]
+  Web -->|"/getcart /addproduct /addappliance /checkout"| Cart[cart-service :8082]
   Web -->|"/pay"| Payment[payment-service :8083]
-  Browser -->|":8084/graphql GraphiQL"| Appliance[appliance-service :8084]
+  Web -->|"/graphql"| Appliance[appliance-service :8084]
   Cart -->|inventory deduct| Product
+  Cart -->|"deduct/restore stock (GraphQL)"| Appliance
   Cart -->|confirm payment| Payment
   Appliance -->|JDBC| DB[(SQL Server)]
   Product -->|JDBC| DB
@@ -38,15 +39,16 @@ In Docker, the React SPA is served by nginx, which also reverse-proxies API call
 | Path prefix | Backend |
 |-------------|---------|
 | `/productsearch` | product-service:8081 |
-| `/getcart`, `/addproduct`, `/clearcart`, `/checkout` | cart-service:8082 |
+| `/getcart`, `/addproduct`, `/addappliance`, `/clearcart`, `/checkout` | cart-service:8082 |
 | `/pay` | payment-service:8083 |
+| `/graphql` | appliance-service:8084 |
 | `/` | React SPA (static files) |
 
 **Not proxied by nginx (call the service port directly):**
 
 | Endpoint | Backend |
 |----------|---------|
-| `/graphql`, `/graphiql` | appliance-service:8084 (host `${APPLIANCE_PORT:-8084}`) |
+| `/graphiql` (GraphQL Playground UI, dev/debug only) | appliance-service:8084 (host `${APPLIANCE_PORT:-8084}`) |
 
 ### Observability
 
@@ -164,9 +166,9 @@ docker compose -f docker/docker-compose.yml up -d --build
 
 ### 3. Open the app
 
-[http://localhost:8080](http://localhost:8080)
+[http://localhost:8080](http://localhost:8080) — includes the **Appliances** nav link/page (unified cart + checkout with groceries).
 
-**Appliances GraphQL** (optional, not via nginx): [http://localhost:8084/graphiql?path=/graphql](http://localhost:8084/graphiql?path=/graphql)
+**Appliances GraphiQL** (optional, direct to the service): [http://localhost:8084/graphiql?path=/graphql](http://localhost:8084/graphiql?path=/graphql)
 
 To start only the appliances stack (SQL Server + product bootstrap + appliance-service):
 
