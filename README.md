@@ -9,11 +9,14 @@ Deploy on **Kubernetes** with the Helm chart in [`k8s/`](k8s/) — see [Option D
 | Component | Port (default) | Role |
 |-----------|----------------|------|
 | **ecommerce-web** | 8080 (Docker/nginx) or 5173 (Vite dev) | React storefront |
-| **product-service** | 8081 | Product catalog + inventory |
+| **product-service** | 8081 | Grocery product catalog + inventory (REST) |
 | **cart-service** | 8082 | Cart + checkout orchestration |
 | **payment-service** | 8083 | Mock payment confirmation |
+| **appliance-service** | 8084 | Appliances catalog + inventory ([GraphQL](http://localhost:8084/graphiql?path=/graphql); not proxied by nginx yet) |
 
 **Checkout flow:** browser → `POST /checkout` (cart) → `POST /internal/inventory/deduct` (product) → `POST /confirm-payment` (payment).
+
+**Appliances (GraphQL):** direct to `appliance-service:8084` — queries `appliances` / `appliance`, mutations `deductApplianceStock` / `restoreApplianceStock`. Uses dedicated `appliances` + `appliance_inventory` tables (fridges, ovens, washing machines). No session headers required.
 
 ```mermaid
 flowchart LR
@@ -21,8 +24,11 @@ flowchart LR
   Web -->|"/productsearch"| Product[product-service :8081]
   Web -->|"/getcart /checkout"| Cart[cart-service :8082]
   Web -->|"/pay"| Payment[payment-service :8083]
+  Browser -->|":8084/graphql GraphiQL"| Appliance[appliance-service :8084]
   Cart -->|inventory deduct| Product
   Cart -->|confirm payment| Payment
+  Appliance -->|JDBC| DB[(SQL Server)]
+  Product -->|JDBC| DB
 ```
 
 ### nginx routing (Docker mode)
@@ -35,6 +41,12 @@ In Docker, the React SPA is served by nginx, which also reverse-proxies API call
 | `/getcart`, `/addproduct`, `/clearcart`, `/checkout` | cart-service:8082 |
 | `/pay` | payment-service:8083 |
 | `/` | React SPA (static files) |
+
+**Not proxied by nginx (call the service port directly):**
+
+| Endpoint | Backend |
+|----------|---------|
+| `/graphql`, `/graphiql` | appliance-service:8084 (host `${APPLIANCE_PORT:-8084}`) |
 
 ### Observability
 
@@ -66,7 +78,7 @@ Both [`docker/docker-compose.yml`](docker/docker-compose.yml) and [`docker-stand
 | **machine-agent** | `appdynamics/machine-agent:26.4.0-root` | `wallmart-docker-host` | SIM / Docker infra monitoring |
 | **sqlserver** | `mcr.microsoft.com/mssql/server:2022-latest` (`linux/amd64`) | `sqlserver` | MSSQL collector target |
 
-Custom app images (`product-service`, `cart-service`, etc.) are built for **linux/amd64 and linux/arm64** via [`docker/scripts/build-all.sh`](docker/scripts/build-all.sh). On Apple Silicon, SQL Server and the DB agent run under amd64 emulation; JVM services can run native arm64.
+Custom app images (`product-service`, `cart-service`, `appliance-service`, etc.) are built for **linux/amd64 and linux/arm64** via [`docker/scripts/build-all.sh`](docker/scripts/build-all.sh). On Apple Silicon, SQL Server and the DB agent run under amd64 emulation; JVM services can run native arm64.
 
 #### Post-deploy: SQL Server collector (Database Visibility)
 
@@ -154,6 +166,14 @@ docker compose -f docker/docker-compose.yml up -d --build
 
 [http://localhost:8080](http://localhost:8080)
 
+**Appliances GraphQL** (optional, not via nginx): [http://localhost:8084/graphiql?path=/graphql](http://localhost:8084/graphiql?path=/graphql)
+
+To start only the appliances stack (SQL Server + product bootstrap + appliance-service):
+
+```bash
+docker compose -f docker/docker-compose.yml up -d --build appliance-service
+```
+
 ### 4. Helper scripts
 
 | Script | What it runs |
@@ -211,9 +231,9 @@ mvn package
 # or: ./ecommerce/scripts/build.sh
 ```
 
-### 2. Start the three APIs
+### 2. Start the backend APIs
 
-**Three terminals:**
+**Four terminals** (grocery REST + appliances GraphQL):
 
 ```bash
 # Terminal 1 — product-service :8081
@@ -224,6 +244,9 @@ cd ecommerce/cart-service && mvn spring-boot:run
 
 # Terminal 3 — payment-service :8083
 cd ecommerce/payment-service && mvn spring-boot:run
+
+# Terminal 4 — appliance-service :8084 (GraphQL)
+cd ecommerce/appliance-service && mvn spring-boot:run
 ```
 
 **Or run packaged JARs:**
@@ -232,6 +255,7 @@ cd ecommerce/payment-service && mvn spring-boot:run
 java -jar ecommerce/product-service/target/product-service-1.0.0-SNAPSHOT.jar
 java -jar ecommerce/cart-service/target/cart-service-1.0.0-SNAPSHOT.jar
 java -jar ecommerce/payment-service/target/payment-service-1.0.0-SNAPSHOT.jar
+java -jar ecommerce/appliance-service/target/appliance-service-1.0.0-SNAPSHOT.jar
 ```
 
 **Or use helper scripts** (background processes):
@@ -278,14 +302,14 @@ cp .env.example .env
 docker compose up -d
 ```
 
-Open `http://<host>:8080` (or `${WEB_PORT}`).
+Open `http://<host>:8080` (or `${WEB_PORT}`). Appliances GraphQL: `http://<host>:${APPLIANCE_PORT:-8084}/graphiql?path=/graphql`.
 
 **Differences from [`docker/`](docker/) compose:**
 
 - No `build:` sections — images must exist as `{REGISTRY_PREFIX}/{service}:{IMAGE_TAG}`
 - Supports `COMPOSE_PULL_POLICY` (default `missing`; set `never` for air-gapped hosts)
 
-Both stacks are otherwise aligned (Java APM, db-agent **`SQLDBSales`**, machine-agent, SQL Server). Browser RUM is baked into the `ecommerce-web` image at build time — set `VITE_OBSERVABILITY_BACKEND` and matching vars in [`docker/.env`](docker/.env) before `build-push-all.sh` (standalone hosts pull the pre-built image).
+Both stacks are otherwise aligned (Java APM, db-agent **`SQLDBSales`**, machine-agent, SQL Server, **`appliance-service`** on 8084). Browser RUM is baked into the `ecommerce-web` image at build time — set `VITE_OBSERVABILITY_BACKEND` and matching vars in [`docker/.env`](docker/.env) before `build-push-all.sh` (standalone hosts pull the pre-built image).
 
 **Air-gapped / offline:**
 
@@ -310,7 +334,9 @@ See [`docker-standalone/README.md`](docker-standalone/README.md) for a short sta
 
 ## Option D — Kubernetes (Helm)
 
-Deploy the core stack (SQL Server + three JVM services + nginx web) on generic Kubernetes with the [`k8s/wallmart-ecommerce/`](k8s/wallmart-ecommerce/) Helm chart. **No AppDynamics agents** in the base chart — application logging only (Phase 1). For full Splunk Observability, add [`o11y/`](o11y/) after deploy.
+Deploy the core stack (SQL Server + three JVM grocery services + nginx web) on generic Kubernetes with the [`k8s/wallmart-ecommerce/`](k8s/wallmart-ecommerce/) Helm chart. **No AppDynamics agents** in the base chart — application logging only (Phase 1). For full Splunk Observability, add [`o11y/`](o11y/) after deploy.
+
+**Note:** `appliance-service` (GraphQL, port 8084) is available in Docker Compose paths only — not yet in this Helm chart.
 
 **Prerequisites:** Kubernetes 1.25+, Helm 3, images built/pushed (see [Building Docker images manually](#building-docker-images-manually)).
 
@@ -438,6 +464,7 @@ Set `IMAGE_TAG=appd` or `IMAGE_TAG=splunk` in compose / `k8s/install.sh` to pull
 - `{REGISTRY_PREFIX}/product-service:{IMAGE_TAG}`
 - `{REGISTRY_PREFIX}/cart-service:{IMAGE_TAG}`
 - `{REGISTRY_PREFIX}/payment-service:{IMAGE_TAG}`
+- `{REGISTRY_PREFIX}/appliance-service:{IMAGE_TAG}`
 - `{REGISTRY_PREFIX}/ecommerce-web:{IMAGE_TAG}`
 - `{REGISTRY_PREFIX}/playwright-loop:{IMAGE_TAG}` (synthetic profile)
 
@@ -476,6 +503,7 @@ Canonical templates: [`docker/.env.example`](docker/.env.example) (Docker compos
 | `PRODUCT_PORT` | No | `8081` | Host → product |
 | `CART_PORT` | No | `8082` | Host → cart |
 | `PAYMENT_PORT` | No | `8083` | Host → payment |
+| `APPLIANCE_PORT` | No | `8084` | Host → appliance-service (GraphQL) |
 | `WALLMART_PRODUCT_SERVICE_BASE_URL` | No | `http://product-service:8081` | cart-service |
 | `WALLMART_PAYMENT_SERVICE_BASE_URL` | No | `http://payment-service:8083` | cart-service |
 | `PLAYWRIGHT_BASE_URL` | No | `http://ecommerce-web` | playwright-loop |
@@ -671,9 +699,10 @@ docker exec -it wallmart-sqlserver /opt/mssql-tools18/bin/sqlcmd -S localhost -U
 WALLMART/
 ├── ecommerce/                 # Maven aggregator
 │   ├── session-support/       # Shared session filter + propagation
-│   ├── product-service/       # :8081
+│   ├── product-service/       # :8081 grocery REST
 │   ├── cart-service/          # :8082
 │   ├── payment-service/       # :8083
+│   ├── appliance-service/     # :8084 appliances GraphQL
 │   └── scripts/               # build.sh, start-all.sh, stop-all.sh, build-and-start.sh
 ├── ecommerce-web/             # React + Vite SPA
 ├── docker/                    # Compose, Dockerfiles, nginx, scripts
@@ -697,10 +726,11 @@ WALLMART/
 
 | Issue | What to try |
 |-------|-------------|
-| Frontend cannot reach APIs in dev | Ensure all three Spring Boot apps are running on 8081–8083 |
-| `400` on API calls | Missing `X-Session-Id` or `X-Session-Username` (browser app sets both automatically) |
+| Frontend cannot reach APIs in dev | Ensure grocery Spring Boot apps are running on 8081–8083; appliances GraphQL on 8084 |
+| `400` on API calls | Missing `X-Session-Id` or `X-Session-Username` (browser app sets both automatically; appliance GraphQL has no session) |
+| GraphiQL stuck on "Loading..." | Hard-refresh; corporate networks may block CDN — use `curl -X POST http://localhost:8084/graphql` or rebuild after the bundled `graphiql/index.html` fix |
 | Docker build fails on `npm ci` | Retry when network is stable, or build web image alone: `docker compose -f docker/docker-compose.yml build ecommerce-web` |
-| JVM services fail to start in Docker | Check `APPDYNAMICS_*` values in `docker/.env` — copy from [`docker/.env.example`](docker/.env.example) if missing |
+| JVM services fail to start in Docker | Check `APPDYNAMICS_*` in `docker/.env`; ensure `splunk-java-agent` sidecar runs first (seeds `/opt/appdynamics/javaagent.jar`) |
 | E2E tests fail | Stack must be up at `PLAYWRIGHT_BASE_URL` (default `http://localhost:8080`) |
 | Port already in use | Change `WEB_PORT` / `PRODUCT_PORT` / etc. in `docker/.env` |
 | Browser RUM not appearing | Rebuild web image after changing `VITE_*` vars; confirm `VITE_OBSERVABILITY_BACKEND` matches your stack (`appdynamics` for Docker, `splunk` for K8s+o11y) |

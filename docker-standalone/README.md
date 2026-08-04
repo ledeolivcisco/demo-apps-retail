@@ -10,7 +10,7 @@ For full project documentation (architecture, local dev, image builds, tests, en
 
 1. `cp .env.example .env` and fill in AppDynamics controller/account values, `MSSQL_SA_PASSWORD`, and registry if not `leandrovo`.
 2. Ensure images exist locally or are pullable:  
-   `{REGISTRY_PREFIX}/product-service`, `cart-service`, `payment-service`, `ecommerce-web` at `{IMAGE_TAG}`.  
+   `{REGISTRY_PREFIX}/product-service`, `cart-service`, `payment-service`, `appliance-service`, `ecommerce-web` at `{IMAGE_TAG}`.  
    AppDynamics agents (`appdynamics/db-agent:26.4.0-5606`, `java-agent`, `machine-agent`) are pulled from Docker Hub.
 3. From this directory:
 
@@ -20,7 +20,9 @@ For full project documentation (architecture, local dev, image builds, tests, en
 
 4. Open the app at `http://<host>:${WEB_PORT:-8080}`.
 
-5. In the AppDynamics Controller, create an **Microsoft SQL Server** collector on agent **`SQLDBSales`**: host **`sqlserver`**, port **1433**, user **`sa`**, password **`MSSQL_SA_PASSWORD`** from `.env`. See [root README](../README.md#post-deploy-sql-server-collector-database-visibility).
+5. **Appliances GraphQL** (optional): GraphiQL at `http://<host>:${APPLIANCE_PORT:-8084}/graphiql?path=/graphql` — not routed through nginx.
+
+6. In the AppDynamics Controller, create an **Microsoft SQL Server** collector on agent **`SQLDBSales`**: host **`sqlserver`**, port **1433**, user **`sa`**, password **`MSSQL_SA_PASSWORD`** from `.env`. See [root README](../README.md#post-deploy-sql-server-collector-database-visibility).
 
 ## Browser RUM
 

@@ -8,6 +8,7 @@ COPY ecommerce/db-support/pom.xml db-support/
 COPY ecommerce/product-service/pom.xml product-service/
 COPY ecommerce/cart-service/pom.xml cart-service/
 COPY ecommerce/payment-service/pom.xml payment-service/
+COPY ecommerce/appliance-service/pom.xml appliance-service/
 COPY ecommerce/session-support/src session-support/src
 COPY ecommerce/db-support/src db-support/src
 COPY ecommerce/payment-service/src payment-service/src

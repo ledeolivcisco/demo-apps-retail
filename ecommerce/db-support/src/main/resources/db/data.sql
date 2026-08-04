@@ -13,3 +13,19 @@ INSERT INTO products (product_id, product_description, product_price, product_pi
 INSERT INTO inventory (product_id, stock) VALUES
   ('1', 999), ('2', 999), ('3', 999), ('4', 999), ('5', 999),
   ('6', 999), ('7', 999), ('8', 999), ('9', 999), ('10', 999);
+
+INSERT INTO appliances (appliance_id, appliance_type, appliance_description, appliance_price, appliance_picture) VALUES
+  ('A1', 'FRIDGE', 'French Door Refrigerator 28 cu ft', 1299.99, 'https://picsum.photos/seed/wallmart-fridge1/200/200'),
+  ('A2', 'FRIDGE', 'Top Freezer Refrigerator 18 cu ft', 699.99, 'https://picsum.photos/seed/wallmart-fridge2/200/200'),
+  ('A3', 'FRIDGE', 'Mini Fridge 4.5 cu ft', 189.99, 'https://picsum.photos/seed/wallmart-fridge3/200/200'),
+  ('A4', 'OVEN', 'Electric Single Wall Oven 30"', 899.99, 'https://picsum.photos/seed/wallmart-oven1/200/200'),
+  ('A5', 'OVEN', 'Gas Range 5 Burner 30"', 749.99, 'https://picsum.photos/seed/wallmart-oven2/200/200'),
+  ('A6', 'OVEN', 'Convection Toaster Oven XL', 149.99, 'https://picsum.photos/seed/wallmart-oven3/200/200'),
+  ('A7', 'WASHING_MACHINE', 'Front Load Washer 4.5 cu ft', 799.99, 'https://picsum.photos/seed/wallmart-washer1/200/200'),
+  ('A8', 'WASHING_MACHINE', 'Top Load Washer 5.0 cu ft', 649.99, 'https://picsum.photos/seed/wallmart-washer2/200/200'),
+  ('A9', 'WASHING_MACHINE', 'Compact Portable Washer', 299.99, 'https://picsum.photos/seed/wallmart-washer3/200/200');
+
+INSERT INTO appliance_inventory (appliance_id, stock) VALUES
+  ('A1', 50), ('A2', 40), ('A3', 100),
+  ('A4', 25), ('A5', 30), ('A6', 75),
+  ('A7', 35), ('A8', 45), ('A9', 60);

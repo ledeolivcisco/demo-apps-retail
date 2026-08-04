@@ -1,0 +1,25 @@
+enum ApplianceType {
+  FRIDGE
+  OVEN
+  WASHING_MACHINE
+}
+
+type Appliance {
+  applianceId: ID!
+  applianceType: ApplianceType!
+  applianceDescription: String!
+  appliancePrice: Float!
+  appliancePicture: String!
+  stock: Int!
+}
+
+type Query {
+  "List/search appliances, optionally filtered by type and/or a free-text match on description."
+  appliances(type: ApplianceType, search: String): [Appliance!]!
+  appliance(applianceId: ID!): Appliance
+}
+
+type Mutation {
+  deductApplianceStock(applianceId: ID!, quantity: Int!): Appliance!
+  restoreApplianceStock(applianceId: ID!, quantity: Int!): Appliance!
+}

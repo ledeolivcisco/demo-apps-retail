@@ -4,6 +4,8 @@ Deploy the FreshMart ecommerce demo with the [wallmart-ecommerce](wallmart-ecomm
 
 The base chart deploys the application only — **no AppDynamics agents** and **no Splunk collector**. For Splunk Observability (Java OTel + optional Browser RUM), see [Observability](#observability) below and [`o11y/README.md`](../o11y/README.md). Step-by-step build + deploy: [`docs/deploy-appd-and-o11y.md`](../docs/deploy-appd-and-o11y.md#splunk-o11y-kubernetes).
 
+**Not in this chart:** `appliance-service` (GraphQL appliances API, port 8084) — use Docker Compose ([`docker/`](../docker/), [`docker-standalone/`](../docker-standalone/), or [`docker-standalone-o11y/`](../docker-standalone-o11y/)).
+
 ## Prerequisites
 
 - Kubernetes 1.25+

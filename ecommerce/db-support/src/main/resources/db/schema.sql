@@ -1,5 +1,7 @@
 DROP TABLE IF EXISTS payment_transaction;
 DROP TABLE IF EXISTS cart_line;
+DROP TABLE IF EXISTS appliance_inventory;
+DROP TABLE IF EXISTS appliances;
 DROP TABLE IF EXISTS inventory;
 DROP TABLE IF EXISTS products;
 
@@ -14,6 +16,20 @@ CREATE TABLE inventory (
   product_id VARCHAR(10) NOT NULL PRIMARY KEY,
   stock      INT NOT NULL CHECK (stock >= 0),
   FOREIGN KEY (product_id) REFERENCES products(product_id)
+);
+
+CREATE TABLE appliances (
+  appliance_id          VARCHAR(10)   NOT NULL PRIMARY KEY,
+  appliance_type        VARCHAR(20)   NOT NULL CHECK (appliance_type IN ('FRIDGE','OVEN','WASHING_MACHINE')),
+  appliance_description NVARCHAR(200) NOT NULL,
+  appliance_price       DECIMAL(10,2) NOT NULL,
+  appliance_picture     NVARCHAR(500) NOT NULL
+);
+
+CREATE TABLE appliance_inventory (
+  appliance_id VARCHAR(10) NOT NULL PRIMARY KEY,
+  stock        INT NOT NULL CHECK (stock >= 0),
+  FOREIGN KEY (appliance_id) REFERENCES appliances(appliance_id)
 );
 
 CREATE TABLE cart_line (

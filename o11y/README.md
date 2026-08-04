@@ -2,7 +2,7 @@
 
 Install the [Splunk Distribution of the OpenTelemetry Collector](https://github.com/signalfx/splunk-otel-collector-chart) to monitor the Kubernetes cluster and auto-instrument the FreshMart Java backends.
 
-**Use with:** Kubernetes app deploy ([`k8s/`](../k8s/)) — not Docker Compose (Docker uses AppDynamics).
+**Use with:** Kubernetes app deploy ([`k8s/`](../k8s/)) — not the AppDynamics Docker Compose path. For **Splunk on Docker without Kubernetes**, use [`docker-standalone-o11y/`](../docker-standalone-o11y/) instead (includes `appliance-service` on port 8084).
 
 | Platform | Install path |
 |----------|--------------|
@@ -18,6 +18,7 @@ Install the [Splunk Distribution of the OpenTelemetry Collector](https://github.
 | Component | Instrumentation | Config location |
 |-----------|-----------------|-----------------|
 | `product-service`, `cart-service`, `payment-service` | Splunk OTel Java agent (operator) | `o11y/` scripts + annotations |
+| `appliance-service` | Splunk OTel Java agent (Docker only) | [`docker-standalone-o11y/`](../docker-standalone-o11y/) — not in K8s chart yet |
 | `ecommerce-web` (React) | Splunk Browser RUM (`@splunk/otel-web`) | Build-time `VITE_*` in web image — see [Browser RUM](#browser-rum-ecommerce-web) |
 | Cluster / container logs | Splunk OTel Collector | `o11y/install.sh` |
 

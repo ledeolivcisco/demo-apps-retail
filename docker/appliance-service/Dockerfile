@@ -9,17 +9,17 @@ COPY ecommerce/product-service/pom.xml product-service/
 COPY ecommerce/cart-service/pom.xml cart-service/
 COPY ecommerce/payment-service/pom.xml payment-service/
 COPY ecommerce/appliance-service/pom.xml appliance-service/
-COPY ecommerce/session-support/src session-support/src
 COPY ecommerce/db-support/src db-support/src
-COPY ecommerce/cart-service/src cart-service/src
-RUN mvn -q -pl cart-service -am -DskipTests package
+COPY ecommerce/appliance-service/src appliance-service/src
+RUN mvn -q -pl appliance-service -am -DskipTests package
 
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
-RUN addgroup -g 1001 app && adduser -u 1001 -G app -D app
-COPY --from=builder /build/cart-service/target/cart-service-*.jar /app/app.jar
+RUN addgroup -g 1001 app && adduser -u 1001 -G app -D app \
+    && apk add --no-cache wget
+COPY --from=builder /build/appliance-service/target/appliance-service-*.jar /app/app.jar
 RUN chown app:app /app/app.jar \
     && mkdir -p /tmp/appdynamics && chown app:app /tmp/appdynamics
 USER app
-EXPOSE 8082
+EXPOSE 8084
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]
