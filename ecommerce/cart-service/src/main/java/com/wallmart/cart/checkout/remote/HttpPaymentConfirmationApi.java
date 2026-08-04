@@ -21,14 +21,17 @@ public final class HttpPaymentConfirmationApi implements PaymentConfirmationApi 
   }
 
   @Override
-  public PayResult confirm(BigDecimal amount) {
-    log.info("event=checkout.payment.requested amount={}", amount);
+  public PayResult confirm(BigDecimal amount, BigDecimal applianceAmount) {
+    log.info(
+        "event=checkout.payment.requested amount={} applianceAmount={}",
+        amount,
+        applianceAmount);
     try {
       return client
           .post()
           .uri("/confirm-payment")
           .contentType(MediaType.APPLICATION_JSON)
-          .body(new PayAmountBody(amount))
+          .body(new PayAmountBody(amount, applianceAmount))
           .retrieve()
           .body(PayResult.class);
     } catch (RestClientResponseException e) {

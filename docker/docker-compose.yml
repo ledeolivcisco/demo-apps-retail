@@ -176,6 +176,8 @@ services:
       WALLMART_DB_USER: sa
       WALLMART_DB_PASSWORD: ${MSSQL_SA_PASSWORD}
       WALLMART_DB_BOOTSTRAP: "false"
+      VALIDATE_CREDIT: ${VALIDATE_CREDIT:-false}
+      CREDIT_VALIDATION_LAMBDA_URL: ${CREDIT_VALIDATION_LAMBDA_URL:-}
 
   appliance-service:
     image: ${REGISTRY_PREFIX:-leandrovo}/appliance-service:${IMAGE_TAG:-latest}

@@ -2,6 +2,7 @@ package com.wallmart.cart.web;
 
 import static com.wallmart.cart.support.SessionTestSupport.withSession;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
@@ -81,7 +82,7 @@ class CheckoutControllerApiTest extends AbstractSqlServerSpringBootTest {
     mockMvc.perform(withSession(post("/addproduct/2"))).andExpect(status().isOk());
 
     doNothing().when(productInventoryApi).deduct(anyList());
-    when(paymentConfirmationApi.confirm(any(BigDecimal.class)))
+    when(paymentConfirmationApi.confirm(any(BigDecimal.class), isNull()))
         .thenReturn(new PayResult("success", "Payment successful"));
 
     mockMvc
@@ -96,7 +97,7 @@ class CheckoutControllerApiTest extends AbstractSqlServerSpringBootTest {
 
     InOrder order = inOrder(productInventoryApi, paymentConfirmationApi);
     order.verify(productInventoryApi).deduct(anyList());
-    order.verify(paymentConfirmationApi).confirm(new BigDecimal("4.29"));
+    order.verify(paymentConfirmationApi).confirm(new BigDecimal("4.29"), null);
 
     mockMvc
         .perform(withSession(get("/getcart")).accept(MediaType.APPLICATION_JSON))
@@ -123,7 +124,7 @@ class CheckoutControllerApiTest extends AbstractSqlServerSpringBootTest {
         .andExpect(jsonPath("$.message").value("Insufficient stock for product 5"));
 
     verify(productInventoryApi).deduct(anyList());
-    verify(paymentConfirmationApi, never()).confirm(any());
+    verify(paymentConfirmationApi, never()).confirm(any(), any());
   }
 
   @Test
@@ -133,7 +134,7 @@ class CheckoutControllerApiTest extends AbstractSqlServerSpringBootTest {
 
     doNothing().when(productInventoryApi).deduct(anyList());
     doNothing().when(productInventoryApi).restore(anyList());
-    when(paymentConfirmationApi.confirm(any(BigDecimal.class)))
+    when(paymentConfirmationApi.confirm(any(BigDecimal.class), any()))
         .thenThrow(new CheckoutPaymentException("down", new RuntimeException("boom")));
 
     mockMvc
@@ -154,7 +155,7 @@ class CheckoutControllerApiTest extends AbstractSqlServerSpringBootTest {
     mockMvc.perform(withSession(post("/addappliance/A6"))).andExpect(status().isOk());
 
     doNothing().when(applianceInventoryApi).deduct(anyList());
-    when(paymentConfirmationApi.confirm(any(BigDecimal.class)))
+    when(paymentConfirmationApi.confirm(any(BigDecimal.class), isNull()))
         .thenReturn(new PayResult("success", "Payment successful"));
 
     mockMvc
@@ -168,6 +169,7 @@ class CheckoutControllerApiTest extends AbstractSqlServerSpringBootTest {
 
     verify(applianceInventoryApi).deduct(anyList());
     verify(productInventoryApi, never()).deduct(anyList());
+    verify(paymentConfirmationApi).confirm(new BigDecimal("149.99"), new BigDecimal("149.99"));
   }
 
   @Test
@@ -178,7 +180,7 @@ class CheckoutControllerApiTest extends AbstractSqlServerSpringBootTest {
 
     doNothing().when(productInventoryApi).deduct(anyList());
     doNothing().when(applianceInventoryApi).deduct(anyList());
-    when(paymentConfirmationApi.confirm(any(BigDecimal.class)))
+    when(paymentConfirmationApi.confirm(any(BigDecimal.class), isNull()))
         .thenReturn(new PayResult("success", "Payment successful"));
 
     mockMvc
@@ -212,7 +214,7 @@ class CheckoutControllerApiTest extends AbstractSqlServerSpringBootTest {
         .andExpect(status().isConflict())
         .andExpect(jsonPath("$.message").value("Insufficient stock for appliance A6"));
 
-    verify(paymentConfirmationApi, never()).confirm(any());
+    verify(paymentConfirmationApi, never()).confirm(any(), any());
   }
 
   @Test

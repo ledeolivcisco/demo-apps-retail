@@ -162,6 +162,8 @@ services:
       WALLMART_DB_USER: sa
       WALLMART_DB_PASSWORD: ${MSSQL_SA_PASSWORD}
       WALLMART_DB_BOOTSTRAP: "false"
+      VALIDATE_CREDIT: ${VALIDATE_CREDIT:-false}
+      CREDIT_VALIDATION_LAMBDA_URL: ${CREDIT_VALIDATION_LAMBDA_URL:-}
 
   appliance-service:
     image: ${REGISTRY_PREFIX:-leandrovo}/appliance-service:${IMAGE_TAG:-latest}
@@ -202,8 +204,8 @@ services:
       WALLMART_DB_BOOTSTRAP: "false"
 
   ecommerce-web:
-#    image: ${REGISTRY_PREFIX:-leandrovo}/ecommerce-web:${IMAGE_TAG:-latest}
-    image: ${REGISTRY_PREFIX:-leandrovo}/ecommerce-web:splunk
+    image: ${REGISTRY_PREFIX:-leandrovo}/ecommerce-web:${IMAGE_TAG:-latest}
+#    image: ${REGISTRY_PREFIX:-leandrovo}/ecommerce-web:splunk
     pull_policy: ${COMPOSE_PULL_POLICY:-missing}
     ports:
       - "${WEB_PORT:-8080}:80"

@@ -67,6 +67,14 @@ public class CheckoutService {
         lines.stream().filter(l -> ItemType.PRODUCT.name().equals(l.itemType())).toList();
     List<CartLineItem> applianceLines =
         lines.stream().filter(l -> ItemType.APPLIANCE.name().equals(l.itemType())).toList();
+    BigDecimal applianceAmount =
+        applianceLines.stream()
+            .map(l -> l.price().multiply(BigDecimal.valueOf(l.quantity())))
+            .reduce(BigDecimal.ZERO, BigDecimal::add)
+            .setScale(MONEY_SCALE, RoundingMode.HALF_UP);
+    if (applianceLines.isEmpty()) {
+      applianceAmount = null;
+    }
     log.info(
         "event=checkout.started lineCount={} cartTotal={} clientAmount={}",
         lines.size(),
@@ -86,7 +94,7 @@ public class CheckoutService {
         applianceInventoryApi.deduct(applianceLines);
         appliancesDeducted = true;
       }
-      PayResult result = paymentConfirmationApi.confirm(normalized);
+      PayResult result = paymentConfirmationApi.confirm(normalized, applianceAmount);
       cartService.clearCart();
       log.info(
           "event=checkout.completed cartTotal={} paymentStatus={}",
