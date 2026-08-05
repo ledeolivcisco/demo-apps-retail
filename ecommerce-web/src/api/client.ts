@@ -93,8 +93,12 @@ export async function fetchAppliances(
   return data.appliances;
 }
 
-export async function addApplianceToCart(applianceId: string): Promise<void> {
-  const res = await fetch(apiUrl(`/addappliance/${encodeURIComponent(applianceId)}`), {
+export async function addApplianceToCart(
+  applianceId: string,
+  price?: number,
+): Promise<void> {
+  const params = price != null ? `?price=${encodeURIComponent(String(price))}` : "";
+  const res = await fetch(apiUrl(`/addappliance/${encodeURIComponent(applianceId)}${params}`), {
     method: "POST",
     headers: withSessionHeaders({ Accept: "application/json" }),
   });

@@ -9,6 +9,7 @@ import com.wallmart.cart.model.Product;
 import com.wallmart.cart.repository.JdbcCartRepository;
 import com.wallmart.session.SessionContext;
 import com.wallmart.session.SessionRegistry;
+import java.math.BigDecimal;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,14 +49,22 @@ public class CartService {
   }
 
   public Optional<String> addAppliance(String applianceId) {
+    return addAppliance(applianceId, null);
+  }
+
+  public Optional<String> addAppliance(String applianceId, BigDecimal unitPrice) {
     sessionRegistry.requireActive(currentSessionId());
     Optional<Appliance> appliance = applianceLookup.findById(applianceId);
     if (appliance.isEmpty()) {
       log.warn("event=cart.item.unknown itemType=APPLIANCE itemId={}", applianceId);
       return Optional.of("Unknown appliance id: " + applianceId);
     }
-    cartRepository.addItem(currentSessionId(), ItemType.APPLIANCE.name(), applianceId);
-    log.info("event=cart.item.added itemType=APPLIANCE itemId={}", applianceId);
+    cartRepository.addItem(
+        currentSessionId(), ItemType.APPLIANCE.name(), applianceId, unitPrice);
+    log.info(
+        "event=cart.item.added itemType=APPLIANCE itemId={} unitPrice={}",
+        applianceId,
+        unitPrice);
     return Optional.empty();
   }
 

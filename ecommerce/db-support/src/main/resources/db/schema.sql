@@ -37,6 +37,7 @@ CREATE TABLE cart_line (
   item_type  VARCHAR(10) NOT NULL CHECK (item_type IN ('PRODUCT','APPLIANCE')),
   item_id    VARCHAR(10) NOT NULL,
   quantity   INT NOT NULL CHECK (quantity > 0),
+  unit_price DECIMAL(10,2) NULL,
   PRIMARY KEY (session_id, item_type, item_id)
 );
 

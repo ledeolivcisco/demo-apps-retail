@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
-# Tears down everything created by deploy.sh:
-#   - API Gateway HTTP API "credit-validation-api"
-#   - Lambda function "credit-validation-lambda"
-#   - IAM role "credit-validation-lambda-role"
+# Tears down everything created by deploy-pricing.sh:
+#   - API Gateway HTTP API "appliance-pricing-api"
+#   - Lambda function "appliance-pricing-lambda"
+#   - IAM role "appliance-pricing-lambda-role"
 #   - Local build artifacts
 #
 # Safe to re-run: skips resources that don't exist instead of failing.
 
 set -uo pipefail
 
-FUNCTION_NAME="credit-validation-lambda"
-ROLE_NAME="credit-validation-lambda-role"
-API_NAME="credit-validation-api"
+FUNCTION_NAME="appliance-pricing-lambda"
+ROLE_NAME="appliance-pricing-lambda-role"
+API_NAME="appliance-pricing-api"
 POLICY_ARN="arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -43,12 +43,10 @@ else
 fi
 
 # --- Local build artifacts ---------------------------------------------------
-if [ -d "${SCRIPT_DIR}/build" ]; then
-  echo "Removing local build directory..."
-  rm -rf "${SCRIPT_DIR}/build"
+if [ -d "${SCRIPT_DIR}/build-pricing" ]; then
+  echo "Removing local build-pricing directory..."
+  rm -rf "${SCRIPT_DIR}/build-pricing"
 fi
 
 echo ""
 echo "Teardown complete."
-echo "CREDIT_VALIDATION_LAMBDA_URL in the compose .env files now points at a deleted API."
-echo "Re-running deploy.sh creates a new API id — update those files with the new endpoint."

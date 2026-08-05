@@ -1,6 +1,7 @@
 package com.wallmart.appliance.graphql;
 
 import com.wallmart.appliance.inventory.InsufficientApplianceStockException;
+import com.wallmart.appliance.pricing.AppliancePricingException;
 import graphql.GraphQLError;
 import graphql.GraphqlErrorBuilder;
 import graphql.schema.DataFetchingEnvironment;
@@ -13,6 +14,15 @@ public class GraphQlExceptionResolver {
   @GraphQlExceptionHandler(InsufficientApplianceStockException.class)
   public GraphQLError handleInsufficientStock(
       InsufficientApplianceStockException ex, DataFetchingEnvironment env) {
+    return GraphqlErrorBuilder.newError(env)
+        .message(ex.getMessage())
+        .errorType(graphql.ErrorType.DataFetchingException)
+        .build();
+  }
+
+  @GraphQlExceptionHandler(AppliancePricingException.class)
+  public GraphQLError handlePricingFailure(
+      AppliancePricingException ex, DataFetchingEnvironment env) {
     return GraphqlErrorBuilder.newError(env)
         .message(ex.getMessage())
         .errorType(graphql.ErrorType.DataFetchingException)

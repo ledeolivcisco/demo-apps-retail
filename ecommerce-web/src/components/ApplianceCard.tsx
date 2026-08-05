@@ -16,7 +16,7 @@ export function ApplianceCard({ appliance }: Props) {
     setBusy(true);
     setMsg(null);
     try {
-      await addApplianceToCart(appliance.applianceId);
+      await addApplianceToCart(appliance.applianceId, appliance.appliancePrice);
       await refreshCart();
       setMsg("Added");
       window.setTimeout(() => setMsg(null), 1500);

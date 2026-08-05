@@ -202,6 +202,8 @@ services:
       WALLMART_DB_USER: sa
       WALLMART_DB_PASSWORD: ${MSSQL_SA_PASSWORD}
       WALLMART_DB_BOOTSTRAP: "false"
+      GET_PRICE: ${GET_PRICE:-false}
+      APPLIANCE_PRICING_LAMBDA_URL: ${APPLIANCE_PRICING_LAMBDA_URL:-}
 
   ecommerce-web:
     image: ${REGISTRY_PREFIX:-leandrovo}/ecommerce-web:${IMAGE_TAG:-latest}

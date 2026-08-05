@@ -25,6 +25,12 @@ o11y/values-local.yaml
 *.jar
 *.jar.original
 
+# --- Python ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
 # --- Node / frontend ---
 node_modules/
 dist/

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Deploys (or updates) the credit-validation-lambda function using only the AWS CLI.
+# Deploys (or updates) the appliance-pricing-lambda function using only the AWS CLI.
 #
 # Creates:
-#   - IAM role "credit-validation-lambda-role" (basic Lambda execution / CloudWatch Logs)
-#   - Lambda function "credit-validation-lambda" (Python 3.13), instrumented with the
+#   - IAM role "appliance-pricing-lambda-role" (basic Lambda execution / CloudWatch Logs)
+#   - Lambda function "appliance-pricing-lambda" (Python 3.13), instrumented with the
 #     Splunk OpenTelemetry Lambda layer (traces + metrics to Splunk Observability Cloud)
 #   - A public HTTP API Gateway in front of it (no auth) — demo only.
 #
@@ -17,22 +17,19 @@
 
 set -euo pipefail
 
-FUNCTION_NAME="credit-validation-lambda"
-ROLE_NAME="credit-validation-lambda-role"
-API_NAME="credit-validation-api"
+FUNCTION_NAME="appliance-pricing-lambda"
+ROLE_NAME="appliance-pricing-lambda-role"
+API_NAME="appliance-pricing-api"
 RUNTIME="python3.13"
-HANDLER="lambda_function.handler"
+HANDLER="pricing_lambda_function.handler"
 REGION="$(aws configure get region)"
 REGION="${REGION:-us-east-1}"
 ACCOUNT_ID="$(aws sts get-caller-identity --query 'Account' --output text)"
 
-# Splunk OpenTelemetry Lambda layer (all-in-one: bundled Collector + Python auto-instrumentation).
-# See https://github.com/signalfx/lambda-layer-versions/blob/main/splunk-apm/splunk-arns.md for
-# other regions/architectures — bump the version number periodically.
 SPLUNK_LAMBDA_LAYER_ARN="${SPLUNK_LAMBDA_LAYER_ARN:-arn:aws:lambda:us-east-1:254067382080:layer:splunk-apm:137}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BUILD_DIR="${SCRIPT_DIR}/build"
+BUILD_DIR="${SCRIPT_DIR}/build-pricing"
 ZIP_PATH="${BUILD_DIR}/function.zip"
 
 if [ -f "${SCRIPT_DIR}/.env" ]; then
@@ -44,7 +41,7 @@ fi
 
 : "${SPLUNK_REALM:?Missing SPLUNK_REALM — copy .env.example to .env and fill it in}"
 : "${SPLUNK_ACCESS_TOKEN:?Missing SPLUNK_ACCESS_TOKEN — copy .env.example to .env and fill it in}"
-OTEL_SERVICE_NAME="${CREDIT_VALIDATION_OTEL_SERVICE_NAME:-credit-validation-lambda}"
+OTEL_SERVICE_NAME="${APPLIANCE_PRICING_OTEL_SERVICE_NAME:-appliance-pricing-lambda}"
 DEPLOYMENT_ENV="${DEPLOYMENT_ENV:-dev}"
 
 echo "Region: ${REGION}"
@@ -70,7 +67,7 @@ EOF
   aws iam create-role \
     --role-name "${ROLE_NAME}" \
     --assume-role-policy-document "${TRUST_POLICY}" \
-    --description "Execution role for the credit-validation-lambda demo function" \
+    --description "Execution role for the appliance-pricing-lambda demo function" \
     >/dev/null
 
   aws iam attach-role-policy \
@@ -88,19 +85,20 @@ echo "Role ARN: ${ROLE_ARN}"
 echo "Packaging function code..."
 rm -rf "${BUILD_DIR}"
 mkdir -p "${BUILD_DIR}"
-(cd "${SCRIPT_DIR}" && zip -q "${ZIP_PATH}" lambda_function.py)
+(cd "${SCRIPT_DIR}" && zip -q "${ZIP_PATH}" pricing_lambda_function.py)
 
 # --- Environment variables (function config + Splunk OTel instrumentation) --
 ENV_JSON="${BUILD_DIR}/environment.json"
-APPROVAL_RATE="${APPROVAL_RATE:-0.8}"
 jq -n \
-  --arg approvalRate "${APPROVAL_RATE}" \
+  --arg priceMin "100" \
+  --arg priceMax "5000" \
   --arg splunkRealm "${SPLUNK_REALM}" \
   --arg splunkToken "${SPLUNK_ACCESS_TOKEN}" \
   --arg serviceName "${OTEL_SERVICE_NAME}" \
   --arg deploymentEnv "deployment.environment=${DEPLOYMENT_ENV}" \
   '{Variables: {
-    APPROVAL_RATE: $approvalRate,
+    PRICE_MIN: $priceMin,
+    PRICE_MAX: $priceMax,
     AWS_LAMBDA_EXEC_WRAPPER: "/opt/otel-instrument",
     SPLUNK_REALM: $splunkRealm,
     SPLUNK_ACCESS_TOKEN: $splunkToken,
@@ -141,7 +139,7 @@ else
     --memory-size 128 \
     --layers "${SPLUNK_LAMBDA_LAYER_ARN}" \
     --environment "file://${ENV_JSON}" \
-    --description "Simulates credit validation, randomly approves/declines (demo only)" \
+    --description "Simulates appliance pricing, returns random price per SKU (demo only)" \
     >/dev/null
 
   aws lambda wait function-active --function-name "${FUNCTION_NAME}"
@@ -161,8 +159,6 @@ else
     --query 'ApiId' --output text)"
 fi
 
-# Grant this specific API Gateway permission to invoke the function.
-# Ignore error if the statement already exists.
 aws lambda add-permission \
   --function-name "${FUNCTION_NAME}" \
   --statement-id "ApiGatewayInvoke" \
@@ -177,9 +173,9 @@ echo ""
 echo "Deployed successfully."
 echo "Public endpoint: ${API_URL}"
 echo ""
-echo "NOTE: a destroy/deploy cycle mints a NEW API id. Update CREDIT_VALIDATION_LAMBDA_URL"
+echo "NOTE: a destroy/deploy cycle mints a NEW API id. Update APPLIANCE_PRICING_LAMBDA_URL"
 echo "      in the compose .env files (docker/, docker-standalone/, docker-standalone-o11y/)"
-echo "      to the endpoint above, or payment-service will call a dead URL."
+echo "      to the endpoint above, or appliance-service will call a dead URL when GET_PRICE=true."
 echo ""
 echo "Try it:"
-echo "  curl -s -X POST '${API_URL}' -H 'content-type: application/json' -d '{\"amount\": 129.99, \"cardLast4\": \"1111\"}' | python3 -m json.tool"
+echo "  curl -s -X POST '${API_URL}' -H 'content-type: application/json' -d '{\"sku\": \"WASH-001\"}' | python3 -m json.tool"

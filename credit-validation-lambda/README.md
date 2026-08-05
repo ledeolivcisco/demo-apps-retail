@@ -23,10 +23,12 @@ needed (see [Observability](#observability) below).
 
 ## Files
 
-- `lambda_function.py` — the handler.
-- `deploy.sh` — creates/updates everything via the AWS CLI (IAM role, function, API Gateway, Splunk instrumentation layer).
-- `destroy.sh` — deletes everything created by `deploy.sh`.
-- `test.sh` — fires a few sample requests at the deployed endpoint.
+- `lambda_function.py` — credit validation handler.
+- `pricing_lambda_function.py` — appliance pricing handler.
+- `deploy.sh` — creates/updates the credit-validation lambda (IAM role, function, API Gateway, Splunk instrumentation layer).
+- `deploy-pricing.sh` — same for the appliance-pricing lambda.
+- `destroy.sh` / `destroy-pricing.sh` — delete resources created by the matching deploy script.
+- `test.sh` / `test-pricing.sh` — fire sample requests at the deployed endpoints.
 - `.env.example` — template for the Splunk Observability Cloud credentials `deploy.sh` needs. Copy to `.env` (gitignored) and fill in real values before deploying.
 
 ## Request / response
@@ -67,6 +69,11 @@ cp .env.example .env   # fill in SPLUNK_ACCESS_TOKEN (and SPLUNK_REALM if not us
 This is idempotent — re-run it any time you change `lambda_function.py` to
 push a new version. It prints the public API endpoint at the end.
 
+Re-running `deploy.sh` on its own reuses the existing API, but a `destroy.sh`
+followed by `deploy.sh` mints a **new API id**. Copy the printed endpoint into
+`CREDIT_VALIDATION_LAMBDA_URL` in the compose `.env` files, otherwise
+payment-service keeps calling the old, deleted URL.
+
 ## Observability
 
 The function is instrumented with the [Splunk OpenTelemetry Lambda layer](https://github.com/signalfx/splunk-otel-lambda)
@@ -78,8 +85,8 @@ sets these environment variables on the function:
 | --- | --- |
 | `AWS_LAMBDA_EXEC_WRAPPER` | `/opt/otel-instrument` — activates auto-instrumentation for Python |
 | `SPLUNK_REALM` / `SPLUNK_ACCESS_TOKEN` | From your local `.env` — where to send telemetry |
-| `OTEL_SERVICE_NAME` | Service name shown in APM (default `credit-validation-lambda`) |
-| `OTEL_RESOURCE_ATTRIBUTES` | `deployment.environment=...` (default `credit-validation-lambda`) |
+| `OTEL_SERVICE_NAME` | Service name shown in APM — set from `CREDIT_VALIDATION_OTEL_SERVICE_NAME` in `.env` (default `credit-validation-lambda`) |
+| `OTEL_RESOURCE_ATTRIBUTES` | `deployment.environment=...` — must match `DEPLOYMENT_ENV` of the calling stack, since Splunk APM scopes the service map per environment |
 | `OTEL_LOGS_EXPORTER` | `none` — this function doesn't emit OTel logs, avoids harmless `Failed to export logs batch` errors in CloudWatch |
 
 Every invocation (via the API Gateway endpoint or a direct `aws lambda
@@ -110,3 +117,83 @@ curl -s -X POST "$API_URL" \
 ```
 
 Deletes the API Gateway, Lambda function, and IAM role created by `deploy.sh`. Safe to re-run.
+
+---
+
+# appliance-pricing-lambda
+
+A standalone AWS Lambda function that simulates volatile appliance pricing for
+demo purposes. It does not call any real pricing engine — it returns a **new
+random integer price between 100 and 5000 on every invocation**, useful for
+generating dynamic pricing traffic in observability demos.
+
+Publicly reachable over HTTPS via an **API Gateway HTTP API** in front of the
+Lambda. The endpoint has **no authentication** — intended for demo use only.
+
+Instrumented with the same **Splunk OpenTelemetry Lambda layer** as
+credit-validation-lambda.
+
+## Files
+
+- `pricing_lambda_function.py` — the handler.
+- `deploy-pricing.sh` — creates/updates everything via the AWS CLI.
+- `destroy-pricing.sh` — deletes everything created by `deploy-pricing.sh`.
+- `test-pricing.sh` — fires sample requests at the deployed endpoint.
+
+## Request / response
+
+Request (`POST` with a JSON body):
+
+```json
+{ "sku": "WASH-001" }
+```
+
+Response:
+
+```json
+{
+  "requestId": "5f1c2e2a-...-...",
+  "sku": "WASH-001",
+  "price": 2847,
+  "timestamp": "2026-08-04T15:24:00Z"
+}
+```
+
+`price` is a random integer between `PRICE_MIN` and `PRICE_MAX` (defaults
+100–5000), recalculated on every call. Missing or empty `sku` returns HTTP 400
+with `{ "error": "sku is required" }`.
+
+## Deploy
+
+Uses the same `.env` file as credit-validation-lambda (Splunk credentials).
+`APPLIANCE_PRICING_OTEL_SERVICE_NAME` in `.env` controls the APM service name
+(default `appliance-pricing-lambda`).
+
+```bash
+cp .env.example .env   # fill in SPLUNK_ACCESS_TOKEN (and SPLUNK_REALM if not us1)
+./deploy-pricing.sh
+```
+
+Re-running is idempotent. A `destroy-pricing.sh` followed by `deploy-pricing.sh`
+mints a **new API id** — copy the printed endpoint if you wire it into another
+service later.
+
+## Try it
+
+```bash
+API_ID=$(aws apigatewayv2 get-apis --query "Items[?Name=='appliance-pricing-api'].ApiId" --output text)
+API_URL=$(aws apigatewayv2 get-api --api-id "$API_ID" --query 'ApiEndpoint' --output text)
+
+curl -s -X POST "$API_URL" \
+  -H 'content-type: application/json' \
+  -d '{"sku": "WASH-001"}' | python3 -m json.tool
+```
+
+Or run `./test-pricing.sh` after deploy.
+
+## Tear down
+
+```bash
+./destroy-pricing.sh
+```
+

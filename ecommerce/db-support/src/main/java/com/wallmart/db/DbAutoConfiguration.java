@@ -55,6 +55,7 @@ public class DbAutoConfiguration {
         ensureDatabaseExists();
         runScripts("classpath:db/schema.sql", "classpath:db/data.sql");
       }
+      runScripts("classpath:db/migrations.sql");
       bootstrapState.markComplete();
     }
 
