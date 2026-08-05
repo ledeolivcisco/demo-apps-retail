@@ -11,6 +11,12 @@ export function Header() {
         <span className="brand-text">FreshMart</span>
       </Link>
       <nav className="header-actions">
+        <Link to="/" className="nav-link">
+          Groceries
+        </Link>
+        <Link to="/appliances" className="nav-link">
+          Appliances
+        </Link>
         <Link to="/cart" className="cart-link" aria-label="Open shopping cart">
           <CartIcon />
           {itemCount > 0 ? (

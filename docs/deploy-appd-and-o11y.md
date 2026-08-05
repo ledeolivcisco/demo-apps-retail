@@ -9,7 +9,9 @@ Short operator guide for building scenario-tagged images and starting the FreshM
 | **AppDynamics** | Docker Compose / [`docker-standalone/`](../docker-standalone/) | `appd` | AppD Java agent in compose | `VITE_OBSERVABILITY_BACKEND=appdynamics` |
 | **Splunk o11y** | Kubernetes + [`o11y/`](../o11y/) | `splunk` | Splunk OTel operator injection | `VITE_OBSERVABILITY_BACKEND=splunk` |
 
-**Image note:** JVM backend images (`product-service`, `cart-service`, `payment-service`) are identical for both scenarios. Only `ecommerce-web` differs — Browser RUM is baked at build time when [`docker/web/Dockerfile`](../docker/web/Dockerfile) copies [`docker/.env`](../docker/.env) as `.env.production`.
+**Image note:** JVM backend images (`product-service`, `cart-service`, `payment-service`, `appliance-service`) are identical for both scenarios. Only `ecommerce-web` differs — Browser RUM is baked at build time when [`docker/web/Dockerfile`](../docker/web/Dockerfile) copies [`docker/.env`](../docker/.env) as `.env.production`.
+
+**Appliance-service** is included in Docker Compose paths ([`docker/`](../docker/), [`docker-standalone/`](../docker-standalone/), [`docker-standalone-o11y/`](../docker-standalone-o11y/)) on port **8084** (GraphQL). It is **not** in the Kubernetes Helm chart yet and is **not** proxied by nginx.
 
 ## Prerequisites
 
@@ -64,6 +66,7 @@ This validates `VITE_OBSERVABILITY_BACKEND=appdynamics` and pushes:
 - `youruser/product-service:appd`
 - `youruser/cart-service:appd`
 - `youruser/payment-service:appd`
+- `youruser/appliance-service:appd`
 - `youruser/ecommerce-web:appd`
 - `youruser/playwright-loop:appd`
 
@@ -80,9 +83,10 @@ IMAGE_TAG=appd ./docker/scripts/build-all.sh
 | Mode | Command | When |
 |------|---------|------|
 | Build on host | `./docker/up.sh` | Dev / single machine |
-| Pull pre-built | `cd docker-standalone && cp .env.example .env && docker compose up -d` | Remote host, no compile |
+| Pull pre-built (AppD) | `cd docker-standalone && cp .env.example .env && docker compose up -d` | Remote host, no compile |
+| Pull pre-built (Splunk o11y) | `cd docker-standalone-o11y && cp .env.example .env && docker compose up -d` | Docker + Splunk OTel (no K8s) |
 
-Open [http://localhost:8080](http://localhost:8080) (or `${WEB_PORT}`).
+Open [http://localhost:8080](http://localhost:8080) (or `${WEB_PORT}`). Appliances GraphQL: [http://localhost:8084/graphiql?path=/graphql](http://localhost:8084/graphiql?path=/graphql).
 
 For standalone hosts, set in `.env`:
 
@@ -93,7 +97,7 @@ IMAGE_TAG=appd
 
 ### 4. Post-start verification
 
-1. **Java APM** — In the AppDynamics Controller, confirm tiers `product-service`, `cart-service`, `payment-service` under application `wallmart-ecommerce`.
+1. **Java APM** — In the AppDynamics Controller, confirm tiers `product-service`, `cart-service`, `payment-service`, and `appliance-service` under application `wallmart-ecommerce`.
 2. **Database Visibility** — Agent **`SQLDBSales`** registers automatically. Create a collector manually:
    - Type: **Microsoft SQL Server**
    - Agent: **`SQLDBSales`**
@@ -155,7 +159,7 @@ REGISTRY_PREFIX=youruser IMAGE_TAG=splunk ./k8s/install.sh
 
 | Signal | Where to check |
 |--------|----------------|
-| Java traces | Splunk Observability Cloud → APM → `product-service`, `cart-service`, `payment-service` |
+| Java traces | Splunk Observability Cloud → APM → `product-service`, `cart-service`, `payment-service`, `appliance-service` |
 | Browser RUM | RUM → sessions for `ecommerce-web` |
 | RUM ingest | Browser DevTools → network to `rum-ingest.{realm}.observability.splunkcloud.com` |
 | Java agent injection | `kubectl get pods -n wallmart` — initContainer `opentelemetry-auto-instrumentation-java` |
@@ -185,6 +189,7 @@ Example layout on Docker Hub:
 youruser/product-service:appd      # same layers as :splunk
 youruser/cart-service:appd
 youruser/payment-service:appd
+youruser/appliance-service:appd
 youruser/ecommerce-web:appd        # AppD Browser RUM baked in
 youruser/ecommerce-web:splunk      # Splunk Browser RUM baked in
 youruser/playwright-loop:appd

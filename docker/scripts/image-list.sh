@@ -5,6 +5,7 @@ WALLMART_IMAGES=(
   "docker/product-service/Dockerfile:product-service"
   "docker/cart-service/Dockerfile:cart-service"
   "docker/payment-service/Dockerfile:payment-service"
+  "docker/appliance-service/Dockerfile:appliance-service"
   "docker/web/Dockerfile:ecommerce-web"
   "docker/playwright-loop/Dockerfile:playwright-loop"
 )

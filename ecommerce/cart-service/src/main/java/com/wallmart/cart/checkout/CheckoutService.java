@@ -1,6 +1,7 @@
 package com.wallmart.cart.checkout;
 
 import com.wallmart.cart.model.CartLineItem;
+import com.wallmart.cart.model.ItemType;
 import com.wallmart.cart.service.CartService;
 import com.wallmart.session.SessionContext;
 import com.wallmart.session.SessionRegistry;
@@ -19,16 +20,19 @@ public class CheckoutService {
 
   private final CartService cartService;
   private final ProductInventoryApi productInventoryApi;
+  private final ApplianceInventoryApi applianceInventoryApi;
   private final PaymentConfirmationApi paymentConfirmationApi;
   private final SessionRegistry sessionRegistry;
 
   public CheckoutService(
       CartService cartService,
       ProductInventoryApi productInventoryApi,
+      ApplianceInventoryApi applianceInventoryApi,
       PaymentConfirmationApi paymentConfirmationApi,
       SessionRegistry sessionRegistry) {
     this.cartService = cartService;
     this.productInventoryApi = productInventoryApi;
+    this.applianceInventoryApi = applianceInventoryApi;
     this.paymentConfirmationApi = paymentConfirmationApi;
     this.sessionRegistry = sessionRegistry;
   }
@@ -59,14 +63,38 @@ public class CheckoutService {
               + ")");
     }
     List<CartLineItem> lines = List.copyOf(cart.lineItems());
+    List<CartLineItem> productLines =
+        lines.stream().filter(l -> ItemType.PRODUCT.name().equals(l.itemType())).toList();
+    List<CartLineItem> applianceLines =
+        lines.stream().filter(l -> ItemType.APPLIANCE.name().equals(l.itemType())).toList();
+    BigDecimal applianceAmount =
+        applianceLines.stream()
+            .map(l -> l.price().multiply(BigDecimal.valueOf(l.quantity())))
+            .reduce(BigDecimal.ZERO, BigDecimal::add)
+            .setScale(MONEY_SCALE, RoundingMode.HALF_UP);
+    if (applianceLines.isEmpty()) {
+      applianceAmount = null;
+    }
     log.info(
         "event=checkout.started lineCount={} cartTotal={} clientAmount={}",
         lines.size(),
         serverTotal,
         normalized);
-    productInventoryApi.deduct(lines);
+
+    // Track which groups were actually deducted so a failure partway through (e.g. products
+    // deducted but appliance stock insufficient) only restores what was actually taken.
+    boolean productsDeducted = false;
+    boolean appliancesDeducted = false;
     try {
-      PayResult result = paymentConfirmationApi.confirm(normalized);
+      if (!productLines.isEmpty()) {
+        productInventoryApi.deduct(productLines);
+        productsDeducted = true;
+      }
+      if (!applianceLines.isEmpty()) {
+        applianceInventoryApi.deduct(applianceLines);
+        appliancesDeducted = true;
+      }
+      PayResult result = paymentConfirmationApi.confirm(normalized, applianceAmount);
       cartService.clearCart();
       log.info(
           "event=checkout.completed cartTotal={} paymentStatus={}",
@@ -78,7 +106,12 @@ public class CheckoutService {
           "event=checkout.compensating.inventory.restore lineCount={} reason={}",
           lines.size(),
           e.getClass().getSimpleName());
-      productInventoryApi.restore(lines);
+      if (productsDeducted) {
+        productInventoryApi.restore(productLines);
+      }
+      if (appliancesDeducted) {
+        applianceInventoryApi.restore(applianceLines);
+      }
       log.error("event=checkout.failed reason={}", e.getMessage());
       throw e;
     }

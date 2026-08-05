@@ -50,10 +50,52 @@ class CartControllerApiTest extends AbstractSqlServerSpringBootTest {
         .perform(withSession(get("/getcart")).accept(MediaType.APPLICATION_JSON))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.lineItems", org.hamcrest.Matchers.hasSize(1)))
-        .andExpect(jsonPath("$.lineItems[0].productId").value("3"))
-        .andExpect(jsonPath("$.lineItems[0].productDescription").value("Large Eggs 12 ct"))
+        .andExpect(jsonPath("$.lineItems[0].itemType").value("PRODUCT"))
+        .andExpect(jsonPath("$.lineItems[0].itemId").value("3"))
+        .andExpect(jsonPath("$.lineItems[0].description").value("Large Eggs 12 ct"))
         .andExpect(jsonPath("$.lineItems[0].quantity").value(1))
         .andExpect(jsonPath("$.total").value(closeTo(3.99, 0.001)));
+  }
+
+  @Test
+  @DisplayName("POST /addappliance/{id} adds line; GET /getcart returns item and total")
+  void addAppliance_post_then_getCart() throws Exception {
+    mockMvc
+        .perform(withSession(post("/addappliance/A6")).accept(MediaType.APPLICATION_JSON))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.message").value("Appliance added to cart"));
+
+    mockMvc
+        .perform(withSession(get("/getcart")).accept(MediaType.APPLICATION_JSON))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.lineItems", org.hamcrest.Matchers.hasSize(1)))
+        .andExpect(jsonPath("$.lineItems[0].itemType").value("APPLIANCE"))
+        .andExpect(jsonPath("$.lineItems[0].itemId").value("A6"))
+        .andExpect(jsonPath("$.lineItems[0].description").value("Convection Toaster Oven XL"))
+        .andExpect(jsonPath("$.lineItems[0].quantity").value(1))
+        .andExpect(jsonPath("$.total").value(closeTo(149.99, 0.001)));
+  }
+
+  @Test
+  @DisplayName("GET and POST /addappliance/{id} return 404 for unknown id")
+  void addAppliance_unknownId_returns404() throws Exception {
+    mockMvc
+        .perform(withSession(get("/addappliance/unknown")).accept(MediaType.APPLICATION_JSON))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.message").value("Unknown appliance id: unknown"));
+  }
+
+  @Test
+  @DisplayName("Cart can hold both products and appliances with a combined total")
+  void addProductAndAppliance_combineInSameCart() throws Exception {
+    mockMvc.perform(withSession(post("/addproduct/1"))).andExpect(status().isOk());
+    mockMvc.perform(withSession(post("/addappliance/A6"))).andExpect(status().isOk());
+
+    mockMvc
+        .perform(withSession(get("/getcart")).accept(MediaType.APPLICATION_JSON))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.lineItems", org.hamcrest.Matchers.hasSize(2)))
+        .andExpect(jsonPath("$.total").value(closeTo(153.48, 0.001)));
   }
 
   @Test

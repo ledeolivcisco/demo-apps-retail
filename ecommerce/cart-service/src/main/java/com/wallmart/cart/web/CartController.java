@@ -6,6 +6,7 @@ import com.wallmart.cart.checkout.CheckoutPaymentException;
 import com.wallmart.cart.checkout.CheckoutService;
 import com.wallmart.cart.model.CartResponse;
 import com.wallmart.cart.service.CartService;
+import java.math.BigDecimal;
 import java.util.Map;
 import java.util.Optional;
 import org.springframework.http.HttpStatus;
@@ -17,6 +18,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -38,6 +40,18 @@ public class CartController {
           .body(Map.of("message", error.get()));
     }
     return ResponseEntity.ok(Map.of("message", "Product added to cart"));
+  }
+
+  @RequestMapping(value = "/addappliance/{id}", method = {RequestMethod.GET, RequestMethod.POST})
+  public ResponseEntity<?> addAppliance(
+      @PathVariable("id") String id,
+      @RequestParam(value = "price", required = false) BigDecimal price) {
+    Optional<String> error = cartService.addAppliance(id, price);
+    if (error.isPresent()) {
+      return ResponseEntity.status(HttpStatus.NOT_FOUND)
+          .body(Map.of("message", error.get()));
+    }
+    return ResponseEntity.ok(Map.of("message", "Appliance added to cart"));
   }
 
   @GetMapping("/getcart")

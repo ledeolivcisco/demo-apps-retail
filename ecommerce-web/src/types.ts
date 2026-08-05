@@ -7,11 +7,23 @@ export type Product = {
   stock?: number;
 };
 
+export type ApplianceType = "FRIDGE" | "OVEN" | "WASHING_MACHINE";
+
+export type Appliance = {
+  applianceId: string;
+  applianceType: ApplianceType;
+  applianceDescription: string;
+  appliancePrice: number;
+  appliancePicture: string;
+  stock: number;
+};
+
 export type CartLineItem = {
-  productId: string;
-  productDescription: string;
-  productPrice: number;
-  productPicture: string;
+  itemType: "PRODUCT" | "APPLIANCE";
+  itemId: string;
+  description: string;
+  price: number;
+  picture: string;
   quantity: number;
 };
 

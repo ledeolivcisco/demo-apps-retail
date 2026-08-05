@@ -116,12 +116,15 @@ services:
     depends_on:
       product-service:
         condition: service_healthy
+      appliance-service:
+        condition: service_healthy
       splunk-java-agent:
         condition: service_started
     environment:
       JAVA_TOOL_OPTIONS: "-javaagent:/opt/appdynamics/javaagent.jar -Dappdynamics.agent.runtime.dir=/tmp/appdynamics -Dappdynamics.agent.applicationName=${APPDYNAMICS_APPLICATION_NAME:-wallmart-ecommerce} -Dappdynamics.agent.tierName=${APPDYNAMICS_AGENT_TIER_NAME_CART:-cart-service} -Dappdynamics.agent.nodeName=${APPDYNAMICS_AGENT_NODE_NAME_CART:-cart-1} -Dappdynamics.controller.hostName=${APPDYNAMICS_CONTROLLER_HOST_NAME} -Dappdynamics.controller.port=${APPDYNAMICS_CONTROLLER_PORT:-443} -Dappdynamics.controller.ssl.enabled=${APPDYNAMICS_CONTROLLER_SSL_ENABLED:-true} -Dappdynamics.agent.accountName=${APPDYNAMICS_AGENT_ACCOUNT_NAME} -Dappdynamics.agent.accountAccessKey=${APPDYNAMICS_AGENT_ACCOUNT_ACCESS_KEY}"
       WALLMART_PRODUCT_SERVICE_BASE_URL: http://product-service:8081
       WALLMART_PAYMENT_SERVICE_BASE_URL: http://payment-service:8083
+      WALLMART_APPLIANCE_SERVICE_BASE_URL: http://appliance-service:8084
       WALLMART_DB_HOST: sqlserver
       WALLMART_DB_PORT: "1433"
       WALLMART_DB_NAME: wallmart
@@ -149,6 +152,37 @@ services:
       WALLMART_DB_USER: sa
       WALLMART_DB_PASSWORD: ${MSSQL_SA_PASSWORD}
       WALLMART_DB_BOOTSTRAP: "false"
+      VALIDATE_CREDIT: ${VALIDATE_CREDIT:-false}
+      CREDIT_VALIDATION_LAMBDA_URL: ${CREDIT_VALIDATION_LAMBDA_URL:-}
+
+  appliance-service:
+    image: ${REGISTRY_PREFIX:-leandrovo}/appliance-service:${IMAGE_TAG:-latest}
+    pull_policy: ${COMPOSE_PULL_POLICY:-missing}
+    ports:
+      - "${APPLIANCE_PORT:-8084}:8084"
+    volumes:
+      - appd_java_agent:/opt/appdynamics
+    depends_on:
+      product-service:
+        condition: service_healthy
+      splunk-java-agent:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8084/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    environment:
+      JAVA_TOOL_OPTIONS: "-javaagent:/opt/appdynamics/javaagent.jar -Dappdynamics.agent.runtime.dir=/tmp/appdynamics -Dappdynamics.agent.applicationName=${APPDYNAMICS_APPLICATION_NAME:-wallmart-ecommerce} -Dappdynamics.agent.tierName=${APPDYNAMICS_AGENT_TIER_NAME_APPLIANCE:-appliance-service} -Dappdynamics.agent.nodeName=${APPDYNAMICS_AGENT_NODE_NAME_APPLIANCE:-appliance-1} -Dappdynamics.controller.hostName=${APPDYNAMICS_CONTROLLER_HOST_NAME} -Dappdynamics.controller.port=${APPDYNAMICS_CONTROLLER_PORT:-443} -Dappdynamics.controller.ssl.enabled=${APPDYNAMICS_CONTROLLER_SSL_ENABLED:-true} -Dappdynamics.agent.accountName=${APPDYNAMICS_AGENT_ACCOUNT_NAME} -Dappdynamics.agent.accountAccessKey=${APPDYNAMICS_AGENT_ACCOUNT_ACCESS_KEY}"
+      WALLMART_DB_HOST: sqlserver
+      WALLMART_DB_PORT: "1433"
+      WALLMART_DB_NAME: wallmart
+      WALLMART_DB_USER: sa
+      WALLMART_DB_PASSWORD: ${MSSQL_SA_PASSWORD}
+      WALLMART_DB_BOOTSTRAP: "false"
+      GET_PRICE: ${GET_PRICE:-false}
+      APPLIANCE_PRICING_LAMBDA_URL: ${APPLIANCE_PRICING_LAMBDA_URL:-}
 
   ecommerce-web:
     image: ${REGISTRY_PREFIX:-leandrovo}/ecommerce-web:${IMAGE_TAG:-latest}
@@ -159,6 +193,7 @@ services:
       - product-service
       - cart-service
       - payment-service
+      - appliance-service
 
   playwright-loop:
     profiles:

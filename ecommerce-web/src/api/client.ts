@@ -1,4 +1,4 @@
-import type { CartResponse, PayResponse, Product } from "@/types";
+import type { Appliance, ApplianceType, CartResponse, PayResponse, Product } from "@/types";
 import { ensureSession } from "@/session/shoppingSession";
 
 const SESSION_ID_HEADER = "X-Session-Id";
@@ -37,6 +37,80 @@ export async function fetchProducts(): Promise<Product[]> {
     throw new Error(`Failed to load products (${res.status})`);
   }
   return parseJson<Product[]>(res);
+}
+
+type GraphQlResponse<T> = {
+  data?: T;
+  errors?: { message: string }[];
+};
+
+async function graphQlRequest<T>(
+  query: string,
+  variables?: Record<string, unknown>,
+): Promise<T> {
+  const res = await fetch(apiUrl("/graphql"), {
+    method: "POST",
+    headers: withSessionHeaders({
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    }),
+    body: JSON.stringify({ query, variables }),
+  });
+  if (!res.ok) {
+    throw new Error(`GraphQL request failed (${res.status})`);
+  }
+  const body = await parseJson<GraphQlResponse<T>>(res);
+  if (body.errors?.length) {
+    throw new Error(body.errors[0].message);
+  }
+  if (body.data === undefined) {
+    throw new Error("GraphQL response missing data");
+  }
+  return body.data;
+}
+
+const APPLIANCES_QUERY = `
+  query Appliances($type: ApplianceType, $search: String) {
+    appliances(type: $type, search: $search) {
+      applianceId
+      applianceType
+      applianceDescription
+      appliancePrice
+      appliancePicture
+      stock
+    }
+  }
+`;
+
+export async function fetchAppliances(
+  type?: ApplianceType,
+  search?: string,
+): Promise<Appliance[]> {
+  const data = await graphQlRequest<{ appliances: Appliance[] }>(APPLIANCES_QUERY, {
+    type: type ?? null,
+    search: search ?? null,
+  });
+  return data.appliances;
+}
+
+export async function addApplianceToCart(
+  applianceId: string,
+  price?: number,
+): Promise<void> {
+  const params = price != null ? `?price=${encodeURIComponent(String(price))}` : "";
+  const res = await fetch(apiUrl(`/addappliance/${encodeURIComponent(applianceId)}${params}`), {
+    method: "POST",
+    headers: withSessionHeaders({ Accept: "application/json" }),
+  });
+  if (res.status === 404) {
+    const body = await parseJson<{ message?: string }>(res).catch(
+      (): { message?: string } => ({}),
+    );
+    throw new Error(body.message ?? "Appliance not found");
+  }
+  if (!res.ok) {
+    throw new Error(`Could not add to cart (${res.status})`);
+  }
 }
 
 export async function addProductToCart(productId: string): Promise<void> {

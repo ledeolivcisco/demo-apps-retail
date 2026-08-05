@@ -46,9 +46,9 @@ export function CartPage() {
         <>
           <ul className="cart-list">
             {lines.map((line) => (
-              <li key={line.productId} className="cart-row">
+              <li key={`${line.itemType}-${line.itemId}`} className="cart-row">
                 <img
-                  src={line.productPicture}
+                  src={line.picture}
                   alt=""
                   width={64}
                   height={64}
@@ -56,13 +56,13 @@ export function CartPage() {
                   loading="lazy"
                 />
                 <div className="cart-row-main">
-                  <span className="cart-desc">{line.productDescription}</span>
+                  <span className="cart-desc">{line.description}</span>
                   <span className="muted small">
-                    {formatMoney(line.productPrice)} × {line.quantity}
+                    {formatMoney(line.price)} × {line.quantity}
                   </span>
                 </div>
                 <div className="cart-row-total">
-                  {formatMoney(line.productPrice * line.quantity)}
+                  {formatMoney(line.price * line.quantity)}
                 </div>
               </li>
             ))}

@@ -16,18 +16,20 @@ For full project documentation (architecture, local dev, image builds, tests, en
 
 1. `cp .env.example .env` and set `SPLUNK_ACCESS_TOKEN`, `SPLUNK_REALM`, `MSSQL_SA_PASSWORD`, and registry if not `leandrovo`.
 2. Ensure images exist locally or are pullable:
-   `{REGISTRY_PREFIX}/product-service`, `cart-service`, `payment-service`, `ecommerce-web` at `{IMAGE_TAG}` (use `splunk` tag for RUM).
+   `{REGISTRY_PREFIX}/product-service`, `cart-service`, `payment-service`, `appliance-service`, `ecommerce-web` at `{IMAGE_TAG}` (use `splunk` tag for RUM).
 3. From this directory:
 
    ```bash
    docker compose up -d
    ```
 
-4. Open the app at `http://<host>:${WEB_PORT:-8080}`.
+4. Open the app at `http://<host>:${WEB_PORT:-8080}` — includes the **Appliances** shopping section (nginx proxies `/graphql` and `/addappliance` to `appliance-service`).
 
 5. Verify collector from the host (distroless image has no in-container health probe): `curl -s http://localhost:13133/`
 
-6. Generate traffic and confirm traces in Splunk APM for `product-service`, `cart-service`, and `payment-service`.
+6. **Appliances GraphiQL** (optional, direct to the service): `http://<host>:${APPLIANCE_PORT:-8084}/graphiql?path=/graphql`.
+
+7. Generate traffic and confirm traces in Splunk APM for `product-service`, `cart-service`, `payment-service`, and `appliance-service`.
 
 ## Observability stack
 

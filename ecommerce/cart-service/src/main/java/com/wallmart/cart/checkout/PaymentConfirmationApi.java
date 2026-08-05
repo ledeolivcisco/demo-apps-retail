@@ -4,5 +4,5 @@ import java.math.BigDecimal;
 
 public interface PaymentConfirmationApi {
 
-  PayResult confirm(BigDecimal amount);
+  PayResult confirm(BigDecimal amount, BigDecimal applianceAmount);
 }

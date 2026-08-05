@@ -55,4 +55,8 @@ public final class SimulatedPaymentDetails {
   public String socialSecurityNumber() {
     return socialSecurityNumber;
   }
+
+  public String cardLast4() {
+    return creditCardNumber.substring(creditCardNumber.length() - 4);
+  }
 }

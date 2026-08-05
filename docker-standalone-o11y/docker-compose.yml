@@ -104,6 +104,8 @@ services:
     depends_on:
       product-service:
         condition: service_healthy
+      appliance-service:
+        condition: service_healthy
       splunk-java-agent:
         condition: service_started
       splunk-otel-collector:
@@ -121,6 +123,7 @@ services:
       SPLUNK_OPAMP_ENDPOINT: http://splunk-otel-collector:4320/v1/opamp
       WALLMART_PRODUCT_SERVICE_BASE_URL: http://product-service:8081
       WALLMART_PAYMENT_SERVICE_BASE_URL: http://payment-service:8083
+      WALLMART_APPLIANCE_SERVICE_BASE_URL: http://appliance-service:8084
       WALLMART_DB_HOST: sqlserver
       WALLMART_DB_PORT: "1433"
       WALLMART_DB_NAME: wallmart
@@ -159,10 +162,52 @@ services:
       WALLMART_DB_USER: sa
       WALLMART_DB_PASSWORD: ${MSSQL_SA_PASSWORD}
       WALLMART_DB_BOOTSTRAP: "false"
+      VALIDATE_CREDIT: ${VALIDATE_CREDIT:-false}
+      CREDIT_VALIDATION_LAMBDA_URL: ${CREDIT_VALIDATION_LAMBDA_URL:-}
+
+  appliance-service:
+    image: ${REGISTRY_PREFIX:-leandrovo}/appliance-service:${IMAGE_TAG:-latest}
+    pull_policy: ${COMPOSE_PULL_POLICY:-missing}
+    ports:
+      - "${APPLIANCE_PORT:-8084}:8084"
+    volumes:
+      - splunk_java_agent:/opt/splunk-otel
+    depends_on:
+      product-service:
+        condition: service_healthy
+      splunk-java-agent:
+        condition: service_started
+      splunk-otel-collector:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8084/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    environment:
+      JAVA_TOOL_OPTIONS: "-javaagent:/opt/splunk-otel/splunk-otel-javaagent.jar"
+      OTEL_SERVICE_NAME: appliance-service
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://splunk-otel-collector:4318
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      OTEL_TRACES_EXPORTER: otlp
+      OTEL_METRICS_EXPORTER: none
+      OTEL_LOGS_EXPORTER: none
+      OTEL_RESOURCE_ATTRIBUTES: deployment.environment=${DEPLOYMENT_ENV:-dev},service.namespace=${SPLUNK_SERVICE_NAMESPACE:-wallmart-ecommerce}
+      SPLUNK_OPAMP_ENABLED: "true"
+      SPLUNK_OPAMP_ENDPOINT: http://splunk-otel-collector:4320/v1/opamp
+      WALLMART_DB_HOST: sqlserver
+      WALLMART_DB_PORT: "1433"
+      WALLMART_DB_NAME: wallmart
+      WALLMART_DB_USER: sa
+      WALLMART_DB_PASSWORD: ${MSSQL_SA_PASSWORD}
+      WALLMART_DB_BOOTSTRAP: "false"
+      GET_PRICE: ${GET_PRICE:-false}
+      APPLIANCE_PRICING_LAMBDA_URL: ${APPLIANCE_PRICING_LAMBDA_URL:-}
 
   ecommerce-web:
-#    image: ${REGISTRY_PREFIX:-leandrovo}/ecommerce-web:${IMAGE_TAG:-latest}
-    image: ${REGISTRY_PREFIX:-leandrovo}/ecommerce-web:splunk
+    image: ${REGISTRY_PREFIX:-leandrovo}/ecommerce-web:${IMAGE_TAG:-latest}
+#    image: ${REGISTRY_PREFIX:-leandrovo}/ecommerce-web:splunk
     pull_policy: ${COMPOSE_PULL_POLICY:-missing}
     ports:
       - "${WEB_PORT:-8080}:80"
@@ -170,6 +215,7 @@ services:
       - product-service
       - cart-service
       - payment-service
+      - appliance-service
 
   playwright-loop:
     profiles:
